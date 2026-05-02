@@ -173,7 +173,9 @@ These are the data shapes that cross domain boundaries. Engineer 2 publishes the
 
 | Shape | Producer → Consumer | Purpose |
 |---|---|---|
-| `SignalEvent` | Generator → Risk engine | Canonical normalized event across **network, BTS, billing, sales, recharge, complaints, device sessions** — the multi-source coverage required by the brief. |
+| `SignalEvent` | Generator → Risk engine | Canonical normalized stream record across **network, BTS, billing, sales, recharge, complaints, device sessions**, including KPI value, baseline, deviation, source system, correlation key, and evidence id. |
+| `FeatureWindow` | Risk engine internals → scoring/prediction | Rolling feature state per LGA/KPI: z-score, delta, anomaly score, sample count, and optional time-to-breach estimate. |
+| `SignalEvidence` | API/State tools → Copilot | Agent-facing normalized evidence summary. The copilot reads this instead of raw stream rows. |
 | `RiskScore` | Risk engine → API/State → Frontend | Per-LGA score, severity, confidence, time-to-breach. |
 | `Incident` | Risk engine → API/State → Frontend, Copilot | Cause, affected subscribers, enterprise lines, revenue at risk, NCC exposure, phase. |
 | `MitigationOption` | Playbook → API/State → Frontend, Copilot | Action id, name, description, expected risk delta, est. cost, time-to-effect, side effects, source playbook. |
@@ -213,7 +215,7 @@ If you read only one section, read your own. Each engineer has a goal, day-by-da
 
 **Deliverables**
 
-- **Deliverable 1.** Lock Ikeja fixtures (LGA IDs, BTS list, baseline KPIs). Stub `SyntheticEventGenerator` exposing `start()`, `trigger_ikeja()`, `enter_recovery()`, `reset()`. Agree with Engineer 2 on `SignalEvent`, `RiskScore`, `Incident` Pydantic shapes.
+- **Deliverable 1.** Lock Ikeja fixtures (LGA IDs, BTS list, baseline KPIs). Stub `SyntheticEventGenerator` exposing `start()`, `trigger_ikeja()`, `enter_recovery()`, `reset()`. Agree with Engineer 2 on `SignalEvent`, `FeatureWindow`, `SignalEvidence`, `RiskScore`, and `Incident` Pydantic shapes.
 - **Deliverable 2.** Real generator producing baseline and Ikeja-mode events. `EventNormalizer`, `EntityResolver`, `FeatureEngine` (rolling z-scores, deltas, co-occurrence). `RiskScoringEngine` writing through `RiskScoreRepository`. `IncidentImpactBuilder` writing through `IncidentRepository`.
 - **Deliverable 3.** `run_pre_action_simulation(incident_id, action_ids)` projecting score curves per action vs. do-nothing.
 - **Deliverable 4.** `RecoveryModel` triggered by approval; score moves toward 42 over the recovery window.
@@ -269,7 +271,7 @@ If you read only one section, read your own. Each engineer has a goal, day-by-da
 
 **Deliverables**
 
-- **Deliverable 1.** Publish Pydantic models: `SignalEvent` (with the seven signal domains including `sales`), `RiskScore`, `Incident`, `MitigationOption`, `MitigationPlaybook`, `Operator`, agent output, `AuditLogEntry`, `NCCPack`. Stub all endpoints (including `GET /me` and `GET /actions/options/{incident_id}`) with locked response shapes. Define the agent tool schemas. Skeleton repositories (in-memory or SQLite).
+- **Deliverable 1.** Publish Pydantic models: `SignalEvent` (with the seven signal domains including `sales`), `FeatureWindow`, `SignalEvidence`, `RiskScore`, `Incident`, `MitigationOption`, `MitigationPlaybook`, `Operator`, agent output, `AuditLogEntry`, and `NCCPack`. Stub all endpoints (including `GET /me` and `GET /actions/options/{incident_id}`) with locked response shapes. Define the agent tool schemas. Skeleton repositories (in-memory or SQLite).
 - **Deliverable 2.** Wire real risk endpoints: `SimulationController` → generator; `RiskController` → `RiskScoreRepository` / `IncidentRepository`. Stub `GET /me` returning a fixed `Operator`.
 - **Deliverable 3.** `GET /actions/options/{incident_id}` reading from the playbook fixture. `POST /actions/simulate` endpoint. Real read tools backing the copilot tool surface (`get_incident_context`, `get_signal_evidence`, `estimate_impact`).
 - **Deliverable 4.** `POST /actions/approve` + append-only audit log (operator from `/me`) + recovery trigger. Remaining tools (`get_mitigation_playbook`, `run_pre_action_simulation`, `get_audit_trail`, `generate_ncc_pack_draft`, `validate_claims_against_context`, `write_investigation_note`). Compliance pack assembly.
