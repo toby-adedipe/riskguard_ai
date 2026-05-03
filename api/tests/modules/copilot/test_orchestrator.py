@@ -44,11 +44,20 @@ class MainInvestigationAgentTestCase(unittest.TestCase):
         run = agent.investigate_trigger(trigger)
 
         self.assertEqual(run.status, "completed")
+        self.assertIsNotNone(run.harness_run_id)
         self.assertIn("network_risk", run.selected_roles)
         self.assertIn("revenue_assurance", run.selected_roles)
         self.assertIn("mitigation", run.selected_roles)
         self.assertIsNotNone(run.summary)
         self.assertIsNotNone(run_repo.get(run.run_id))
+        assert run.harness_run_id is not None
+        report = run_repo.get_report(run.harness_run_id)
+        self.assertIsNotNone(report)
+        assert report is not None
+        self.assertGreaterEqual(len(report.steps), 1)
+        self.assertGreaterEqual(len(report.evidence), 1)
+        self.assertTrue(report.approval_required)
+        self.assertIsNotNone(report.mitigation_simulation)
 
 
 if __name__ == "__main__":

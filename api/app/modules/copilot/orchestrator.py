@@ -6,7 +6,7 @@ from typing import Protocol
 
 from app.core.schemas import AgentResponse, InvestigationRun, InvestigationTrigger
 from app.modules.copilot.db import InvestigationRunRepository
-from app.modules.copilot.harness import InvestigationHarness
+from app.modules.copilot.harness import HarnessRunReport, InvestigationHarness
 from app.modules.copilot.role_plugins import (
     AgentExecutionContext,
     ROLE_PLUGIN_TYPES,
@@ -55,9 +55,21 @@ class MainInvestigationAgent:
         return self._validate_response(raw_response)
 
     def investigate_trigger(self, trigger: InvestigationTrigger) -> InvestigationRun:
+        run, _ = self._run_and_persist(trigger)
+        return run
+
+    def investigate_trigger_report(self, trigger: InvestigationTrigger) -> HarnessRunReport:
+        _, harness_report = self._run_and_persist(trigger)
+        return harness_report
+
+    def _run_and_persist(
+        self,
+        trigger: InvestigationTrigger,
+    ) -> tuple[InvestigationRun, HarnessRunReport]:
         harness_report = self.run_harness(trigger)
         run = InvestigationRun(
             run_id=str(uuid4()),
+            harness_run_id=harness_report.harness_run_id,
             lga_id=trigger.lga_id,
             incident_id=trigger.incident_id,
             trigger=trigger,
@@ -67,6 +79,7 @@ class MainInvestigationAgent:
             created_at=datetime.now(timezone.utc),
         )
         self._runs.create(run)
+        self._runs.create_report(harness_report)
 
         completed = run.model_copy(
             update={
@@ -77,7 +90,7 @@ class MainInvestigationAgent:
             }
         )
         self._runs.update(completed)
-        return completed
+        return completed, harness_report
 
     def run_harness(self, trigger: InvestigationTrigger):
         harness = InvestigationHarness(

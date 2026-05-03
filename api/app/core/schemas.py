@@ -15,6 +15,13 @@ SeverityHint = Literal["low", "medium", "high", "critical"]
 IncidentPhase = Literal["active", "mitigating", "recovery", "resolved"]
 TriggerType = Literal["threshold", "manual_query", "phase_change"]
 InvestigationStatus = Literal["queued", "running", "completed", "failed", "rejected"]
+OperatorRole = Literal[
+    "admin",
+    "network_ops",
+    "revenue_assurance",
+    "cx_ops",
+    "compliance_officer",
+]
 SignalDomain = Literal[
     "network",
     "bts",
@@ -198,6 +205,12 @@ class AuditLogEntry(BaseModel):
     timestamp: datetime
 
 
+class Operator(BaseModel):
+    operator_id: str
+    name: str
+    role: OperatorRole
+
+
 class AgentFact(BaseModel):
     claim: str
     evidence_id: str
@@ -228,6 +241,7 @@ class InvestigationTrigger(BaseModel):
 
 class InvestigationRun(BaseModel):
     run_id: str
+    harness_run_id: str | None = None
     lga_id: str
     incident_id: str | None = None
     trigger: InvestigationTrigger

@@ -17,8 +17,10 @@ from semantic_kernel.functions import kernel_function
 
 from app.core.config import Settings
 from app.core.schemas import AgentFact, AgentInference, AgentRecommendation, AgentResponse
+from app.modules.copilot.harness import HarnessRunReport
 from app.modules.copilot.kernel import SERVICE_ID, build_semantic_kernel
 from app.modules.copilot.role_plugins import AgentExecutionContext
+from app.modules.copilot.schemas import FollowUpExchange
 from app.modules.copilot.tool_registry import ToolRegistry
 from app.modules.copilot.tool_contracts import ROLE_ALLOWED_TOOLS
 
@@ -27,6 +29,12 @@ class StructuredRoleResponse(BaseModel):
     facts: list[AgentFact] = Field(default_factory=list)
     inferences: list[AgentInference] = Field(default_factory=list)
     recommendations: list[AgentRecommendation] = Field(default_factory=list)
+
+
+class StructuredReportFollowUpResponse(BaseModel):
+    answer: str
+    evidence_ids: list[str] = Field(default_factory=list)
+    recommendation_actions: list[str] = Field(default_factory=list)
 
 
 ROLE_DIRECTIVES: dict[str, str] = {
@@ -229,6 +237,108 @@ Return this exact shape:
                 "recommendations": recommendations,
             }
         )
+
+
+@dataclass
+class SemanticKernelReportFollowUpRunner:
+    settings: Settings
+    _runner: asyncio.Runner | None = None
+
+    def run(
+        self,
+        *,
+        report: HarnessRunReport,
+        history: list[FollowUpExchange],
+        message: str,
+    ) -> StructuredReportFollowUpResponse:
+        if self._runner is None:
+            self._runner = asyncio.Runner()
+        return self._runner.run(
+            self._arun(report=report, history=history, message=message)
+        )
+
+    def close(self) -> None:
+        if self._runner is not None:
+            self._runner.close()
+            self._runner = None
+
+    async def _arun(
+        self,
+        *,
+        report: HarnessRunReport,
+        history: list[FollowUpExchange],
+        message: str,
+    ) -> StructuredReportFollowUpResponse:
+        kernel = build_semantic_kernel(self.settings)
+        prompt_function = kernel.add_function(
+            plugin_name="copilot_follow_up",
+            function_name="report_follow_up_response",
+            prompt=self._prompt(),
+            prompt_execution_settings=AzureChatPromptExecutionSettings(
+                service_id=SERVICE_ID,
+                temperature=0,
+                max_completion_tokens=700,
+            ),
+        )
+        result = await kernel.invoke(
+            function=prompt_function,
+            arguments=KernelArguments(
+                report_json=report.model_dump_json(),
+                history_json=json.dumps(
+                    [exchange.model_dump(mode="json") for exchange in history],
+                    default=str,
+                ),
+                message=message,
+            ),
+        )
+        payload = StructuredReportFollowUpResponse.model_validate(
+            SemanticKernelRoleRunner._extract_json_payload(str(result).strip())
+        )
+        known_evidence_ids = {evidence.evidence_id for evidence in report.evidence}
+        known_actions = {recommendation.action for recommendation in report.recommendations}
+        return payload.model_copy(
+            update={
+                "evidence_ids": [
+                    evidence_id
+                    for evidence_id in payload.evidence_ids
+                    if evidence_id in known_evidence_ids
+                ],
+                "recommendation_actions": [
+                    action
+                    for action in payload.recommendation_actions
+                    if action in known_actions
+                ],
+            }
+        )
+
+    @staticmethod
+    def _prompt() -> str:
+        return """
+You are the RiskGuard AI report follow-up assistant.
+
+Use only the persisted investigation report and the conversation history.
+Do not invent KPIs, money, subscriber counts, sites, evidence ids, or actions.
+If the user asks for something outside the saved report, say what the report can
+support and what extra data would be needed.
+Support natural multi-turn questions. Do not classify by keywords; reason from
+the report, history, and the current message.
+
+Persisted report JSON:
+{{{{$report_json}}}}
+
+Conversation history JSON:
+{{{{$history_json}}}}
+
+Current user message:
+{{{{$message}}}}
+
+Return JSON only:
+{
+  "answer": "string",
+  "evidence_ids": ["evidence_id from report"],
+  "recommendation_actions": ["action id from report"]
+}
+""".strip()
 
 
 class RoleScopedToolPlugin:

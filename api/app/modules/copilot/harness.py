@@ -60,6 +60,30 @@ class HarnessStepResult(BaseModel):
     missing_tools: list[str] = Field(default_factory=list)
 
 
+class EvidenceReference(BaseModel):
+    evidence_id: str
+    summary: str
+    domain: SignalDomain | None = None
+    kpi: str | None = None
+    source_system: str | None = None
+
+
+class MitigationSimulationAction(BaseModel):
+    action_id: str
+    projected_score_curve: list[float] = Field(default_factory=list)
+    confidence: float
+    time_to_effect_minutes: int
+    recommended: bool = False
+
+
+class MitigationSimulationSummary(BaseModel):
+    incident_id: str
+    do_nothing_curve: list[float] = Field(default_factory=list)
+    actions: list[MitigationSimulationAction] = Field(default_factory=list)
+    recommended_action_id: str | None = None
+    summary: str
+
+
 class HarnessRunReport(BaseModel):
     harness_run_id: str
     playbook_id: str
@@ -73,7 +97,11 @@ class HarnessRunReport(BaseModel):
     steps: list[HarnessStepResult]
     tools_called: list[str] = Field(default_factory=list)
     evidence_ids: list[str] = Field(default_factory=list)
+    evidence: list[EvidenceReference] = Field(default_factory=list)
     recommendations: list[AgentRecommendation] = Field(default_factory=list)
+    mitigation_simulation: MitigationSimulationSummary | None = None
+    approval_required: bool = False
+    next_actions: list[str] = Field(default_factory=list)
     summary: str
 
 
@@ -129,6 +157,9 @@ class InvestigationHarness:
             for result in results
             for recommendation in result.recommendations
         )
+        evidence = self._build_evidence_references(trigger, evidence_ids)
+        mitigation_simulation = self._build_mitigation_simulation(trigger, recommendations)
+        approval_required = any(recommendation.requires_approval for recommendation in recommendations)
         summary = self._build_summary(trigger, results, recommendations)
         return HarnessRunReport(
             harness_run_id=str(uuid4()),
@@ -143,7 +174,11 @@ class InvestigationHarness:
             steps=results,
             tools_called=tools_called,
             evidence_ids=evidence_ids,
+            evidence=evidence,
             recommendations=recommendations,
+            mitigation_simulation=mitigation_simulation,
+            approval_required=approval_required,
+            next_actions=self._build_next_actions(recommendations, mitigation_simulation),
             summary=summary,
         )
 
@@ -349,6 +384,125 @@ class InvestigationHarness:
         for recommendation in recommendations:
             deduped.setdefault(recommendation.action, recommendation)
         return list(deduped.values())
+
+    def _build_evidence_references(
+        self,
+        trigger: InvestigationTrigger,
+        evidence_ids: list[str],
+    ) -> list[EvidenceReference]:
+        if not evidence_ids:
+            return []
+
+        domains = trigger.triggered_domains or self._all_domains_for_incident()
+        signal_evidence = self._registry.call(
+            "investigation_harness",
+            "get_signal_evidence",
+            trigger.lga_id,
+            domains,
+            50,
+        )
+        evidence_by_id = {
+            evidence.evidence_id: evidence
+            for evidence in signal_evidence
+        }
+        references: list[EvidenceReference] = []
+        for evidence_id in evidence_ids:
+            evidence = evidence_by_id.get(evidence_id)
+            if evidence is None:
+                references.append(
+                    EvidenceReference(
+                        evidence_id=evidence_id,
+                        summary="Investigation artifact produced during the run.",
+                    )
+                )
+                continue
+            references.append(
+                EvidenceReference(
+                    evidence_id=evidence.evidence_id,
+                    summary=evidence.summary,
+                    domain=evidence.domain,
+                    kpi=evidence.kpi,
+                    source_system=evidence.source_system,
+                )
+            )
+        return references
+
+    def _build_mitigation_simulation(
+        self,
+        trigger: InvestigationTrigger,
+        recommendations: list[AgentRecommendation],
+    ) -> MitigationSimulationSummary | None:
+        if trigger.incident_id is None:
+            return None
+
+        incident = self._registry.call(
+            "investigation_harness",
+            "get_incident_context",
+            incident_id=trigger.incident_id,
+            lga_id=trigger.lga_id,
+        )
+        if incident is None:
+            return None
+
+        risk_type = incident.cause.replace(" ", "_")
+        playbook = self._registry.call(
+            "investigation_harness",
+            "get_mitigation_playbook",
+            risk_type,
+        )
+        action_ids = [option.action_id for option in playbook.options]
+        if not action_ids:
+            return None
+
+        simulation = self._registry.call(
+            "investigation_harness",
+            "run_pre_action_simulation",
+            trigger.incident_id,
+            action_ids,
+        )
+        recommended_action_id = recommendations[0].action if recommendations else None
+        actions = [
+            MitigationSimulationAction(
+                action_id=projection.action_id,
+                projected_score_curve=projection.projected_score_curve,
+                confidence=projection.confidence,
+                time_to_effect_minutes=projection.time_to_effect_minutes,
+                recommended=projection.action_id == recommended_action_id,
+            )
+            for projection in simulation.actions
+        ]
+        summary = "Compared mitigation options against the do-nothing score curve."
+        if recommended_action_id is not None:
+            summary = f"Recommended {recommended_action_id} based on the lowest supported projected score curve."
+        return MitigationSimulationSummary(
+            incident_id=trigger.incident_id,
+            do_nothing_curve=simulation.do_nothing_curve,
+            actions=actions,
+            recommended_action_id=recommended_action_id,
+            summary=summary,
+        )
+
+    @staticmethod
+    def _build_next_actions(
+        recommendations: list[AgentRecommendation],
+        mitigation_simulation: MitigationSimulationSummary | None,
+    ) -> list[str]:
+        if recommendations:
+            action = recommendations[0].action
+            return [
+                f"Review the recommended mitigation action `{action}`.",
+                "Request human approval before executing mitigation.",
+                "Keep the NCC evidence pack ready if regulatory exposure is requested.",
+            ]
+        if mitigation_simulation is not None:
+            return [
+                "Review the mitigation simulation before approving an action.",
+                "Continue monitoring the active incident until a supported action is selected.",
+            ]
+        return [
+            "Review the collected evidence.",
+            "Continue monitoring for new threshold breaches.",
+        ]
 
 
 def build_default_investigation_playbook(selected_roles: list[str]) -> HarnessPlaybook:
