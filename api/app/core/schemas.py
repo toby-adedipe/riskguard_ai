@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 Severity = Literal["green", "amber", "red"]
 SeverityHint = Literal["low", "medium", "high", "critical"]
 IncidentPhase = Literal["active", "mitigating", "recovery", "resolved"]
+TriggerType = Literal["threshold", "manual_query", "phase_change"]
+InvestigationStatus = Literal["queued", "running", "completed", "failed", "rejected"]
 SignalDomain = Literal[
     "network",
     "bts",
@@ -170,6 +172,22 @@ class Incident(BaseModel):
     impact: IncidentImpact
 
 
+class MitigationOption(BaseModel):
+    action_id: str
+    name: str
+    description: str
+    expected_risk_delta: float
+    estimated_cost_ngn: float
+    time_to_effect_minutes: int
+    side_effects: list[str] = Field(default_factory=list)
+    source_playbook: str
+
+
+class MitigationPlaybook(BaseModel):
+    risk_type: str
+    options: list[MitigationOption] = Field(default_factory=list)
+
+
 class AuditLogEntry(BaseModel):
     entry_id: str
     incident_id: str
@@ -195,6 +213,32 @@ class AgentRecommendation(BaseModel):
     requires_approval: bool = True
 
 
+class InvestigationTrigger(BaseModel):
+    trigger_id: str
+    lga_id: str
+    incident_id: str | None = None
+    trigger_type: TriggerType
+    score: float | None = None
+    confidence: float | None = None
+    time_to_breach_minutes: int | None = None
+    triggered_domains: list[SignalDomain] = Field(default_factory=list)
+    reason: str
+    created_at: datetime
+
+
+class InvestigationRun(BaseModel):
+    run_id: str
+    lga_id: str
+    incident_id: str | None = None
+    trigger: InvestigationTrigger
+    selected_roles: list[str] = Field(default_factory=list)
+    tools_called: list[str] = Field(default_factory=list)
+    status: InvestigationStatus
+    summary: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
 class AgentResponse(BaseModel):
     agent_role: str
     incident_id: str
@@ -203,3 +247,5 @@ class AgentResponse(BaseModel):
     recommendations: list[AgentRecommendation] = Field(default_factory=list)
     tools_called: list[str] = Field(default_factory=list)
     validation_status: Literal["passed", "revised", "rejected"] = "passed"
+    known_evidence_ids: list[str] = Field(default_factory=list, exclude=True)
+    allowed_recommendation_actions: list[str] = Field(default_factory=list, exclude=True)
