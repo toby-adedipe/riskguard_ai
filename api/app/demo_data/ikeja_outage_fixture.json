@@ -1,0 +1,774 @@
+{
+  "signal_events": [
+    {
+      "event_id": "evt-ikeja-network-001",
+      "lga_id": "ikeja",
+      "domain": "network",
+      "kpi": "cell_availability_pct",
+      "value": 72.4,
+      "unit": "pct",
+      "source_system": "nms",
+      "baseline_value": 98.7,
+      "delta_pct": -26.65,
+      "threshold_value": 90.0,
+      "anomaly_score": 0.93,
+      "severity_hint": "critical",
+      "sample_window_minutes": 15,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:network:availability",
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "site_id": "SITE-IKEJA-014",
+        "bts_id": "BTS-IKEJA-014",
+        "service_type": "voice-data"
+      },
+      "timestamp": "2026-05-02T14:03:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-network-002",
+      "lga_id": "ikeja",
+      "domain": "network",
+      "kpi": "dropped_call_rate_pct",
+      "value": 18.6,
+      "unit": "pct",
+      "source_system": "nms",
+      "baseline_value": 1.8,
+      "delta_pct": 933.33,
+      "threshold_value": 4.5,
+      "anomaly_score": 0.9,
+      "severity_hint": "critical",
+      "sample_window_minutes": 15,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:network:dropped_calls",
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "site_id": "SITE-IKEJA-014",
+        "bts_id": "BTS-IKEJA-014",
+        "service_type": "voice"
+      },
+      "timestamp": "2026-05-02T14:04:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-network-003",
+      "lga_id": "ikeja",
+      "domain": "network",
+      "kpi": "congestion_rate_pct",
+      "value": 91.0,
+      "unit": "pct",
+      "source_system": "nms",
+      "baseline_value": 52.0,
+      "delta_pct": 75.0,
+      "threshold_value": 70.0,
+      "anomaly_score": 0.82,
+      "severity_hint": "high",
+      "sample_window_minutes": 15,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:network:congestion",
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "site_id": "SITE-IKEJA-017",
+        "bts_id": "BTS-IKEJA-017",
+        "service_type": "data"
+      },
+      "timestamp": "2026-05-02T14:05:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-bts-001",
+      "lga_id": "ikeja",
+      "domain": "bts",
+      "kpi": "site_availability_pct",
+      "value": 61.5,
+      "unit": "pct",
+      "source_system": "bts-telemetry",
+      "baseline_value": 99.2,
+      "delta_pct": -38.0,
+      "threshold_value": 92.0,
+      "anomaly_score": 0.95,
+      "severity_hint": "critical",
+      "sample_window_minutes": 15,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:bts:availability",
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "site_id": "SITE-IKEJA-014",
+        "bts_id": "BTS-IKEJA-014"
+      },
+      "timestamp": "2026-05-02T14:03:30Z"
+    },
+    {
+      "event_id": "evt-ikeja-bts-002",
+      "lga_id": "ikeja",
+      "domain": "bts",
+      "kpi": "bts_dropped_call_rate_pct",
+      "value": 16.2,
+      "unit": "pct",
+      "source_system": "bts-telemetry",
+      "baseline_value": 2.1,
+      "delta_pct": 671.43,
+      "threshold_value": 5.0,
+      "anomaly_score": 0.88,
+      "severity_hint": "critical",
+      "sample_window_minutes": 15,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:bts:dropped_calls",
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "site_id": "SITE-IKEJA-017",
+        "bts_id": "BTS-IKEJA-017"
+      },
+      "timestamp": "2026-05-02T14:04:30Z"
+    },
+    {
+      "event_id": "evt-ikeja-billing-001",
+      "lga_id": "ikeja",
+      "domain": "billing",
+      "kpi": "failed_rating_events",
+      "value": 12840,
+      "unit": "count",
+      "source_system": "charging-gw",
+      "baseline_value": 640,
+      "delta_pct": 1906.25,
+      "threshold_value": 1800,
+      "anomaly_score": 0.86,
+      "severity_hint": "high",
+      "sample_window_minutes": 30,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:billing:failed_rating",
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "customer_segment": "consumer",
+        "service_type": "prepaid-billing"
+      },
+      "timestamp": "2026-05-02T14:08:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-billing-002",
+      "lga_id": "ikeja",
+      "domain": "billing",
+      "kpi": "revenue_leakage_anomaly_score",
+      "value": 0.86,
+      "unit": "score",
+      "source_system": "revenue-assurance",
+      "baseline_value": 0.11,
+      "delta_pct": 681.82,
+      "threshold_value": 0.45,
+      "anomaly_score": 0.86,
+      "severity_hint": "high",
+      "sample_window_minutes": 30,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:billing:leakage",
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "customer_segment": "consumer",
+        "service_type": "postpaid-billing"
+      },
+      "timestamp": "2026-05-02T14:09:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-sales-001",
+      "lga_id": "ikeja",
+      "domain": "sales",
+      "kpi": "activation_success_rate_pct",
+      "value": 58.0,
+      "unit": "pct",
+      "source_system": "crm-sales",
+      "baseline_value": 96.4,
+      "delta_pct": -39.83,
+      "threshold_value": 85.0,
+      "anomaly_score": 0.79,
+      "severity_hint": "high",
+      "sample_window_minutes": 30,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:sales:activations",
+      "dimensions": {
+        "channel_id": "retail-store",
+        "dealer_id": "DLR-IKEJA-004",
+        "customer_segment": "consumer"
+      },
+      "timestamp": "2026-05-02T14:10:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-sales-002",
+      "lga_id": "ikeja",
+      "domain": "sales",
+      "kpi": "b2b_order_failure_rate_pct",
+      "value": 22.0,
+      "unit": "pct",
+      "source_system": "enterprise-crm",
+      "baseline_value": 1.3,
+      "delta_pct": 1592.31,
+      "threshold_value": 6.0,
+      "anomaly_score": 0.81,
+      "severity_hint": "high",
+      "sample_window_minutes": 30,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:sales:b2b_orders",
+      "dimensions": {
+        "enterprise_account_id": "ENT-IKEJA-117",
+        "channel_id": "b2b-digital",
+        "customer_segment": "enterprise"
+      },
+      "timestamp": "2026-05-02T14:11:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-recharge-001",
+      "lga_id": "ikeja",
+      "domain": "recharge",
+      "kpi": "recharge_success_rate_pct",
+      "value": 68.1,
+      "unit": "pct",
+      "source_system": "recharge-switch",
+      "baseline_value": 99.0,
+      "delta_pct": -31.21,
+      "threshold_value": 90.0,
+      "anomaly_score": 0.77,
+      "severity_hint": "high",
+      "sample_window_minutes": 30,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:recharge:success",
+      "dimensions": {
+        "channel_id": "ussd",
+        "customer_segment": "consumer",
+        "service_type": "airtime-recharge"
+      },
+      "timestamp": "2026-05-02T14:12:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-complaints-001",
+      "lga_id": "ikeja",
+      "domain": "complaints",
+      "kpi": "complaint_volume",
+      "value": 842,
+      "unit": "count",
+      "source_system": "cx-desk",
+      "baseline_value": 118,
+      "delta_pct": 613.56,
+      "threshold_value": 240,
+      "anomaly_score": 0.92,
+      "severity_hint": "critical",
+      "sample_window_minutes": 15,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:complaints:volume",
+      "dimensions": {
+        "channel_id": "contact-center",
+        "customer_segment": "consumer",
+        "service_type": "complaint-intake"
+      },
+      "timestamp": "2026-05-02T14:13:00Z"
+    },
+    {
+      "event_id": "evt-ikeja-device-001",
+      "lga_id": "ikeja",
+      "domain": "device_sessions",
+      "kpi": "session_failure_rate_pct",
+      "value": 27.4,
+      "unit": "pct",
+      "source_system": "core-network",
+      "baseline_value": 2.8,
+      "delta_pct": 878.57,
+      "threshold_value": 6.0,
+      "anomaly_score": 0.89,
+      "severity_hint": "critical",
+      "sample_window_minutes": 15,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:device_sessions:session_failures",
+      "dimensions": {
+        "device_cohort": "4g-smartphones",
+        "customer_segment": "consumer",
+        "service_type": "mobile-data"
+      },
+      "timestamp": "2026-05-02T14:13:30Z"
+    },
+    {
+      "event_id": "evt-ikeja-device-002",
+      "lga_id": "ikeja",
+      "domain": "device_sessions",
+      "kpi": "attach_failure_rate_pct",
+      "value": 11.6,
+      "unit": "pct",
+      "source_system": "core-network",
+      "baseline_value": 0.9,
+      "delta_pct": 1188.89,
+      "threshold_value": 3.0,
+      "anomaly_score": 0.84,
+      "severity_hint": "high",
+      "sample_window_minutes": 15,
+      "correlation_key": "ikeja-outage-wave-1",
+      "evidence_id": "evd:ikeja:device_sessions:attach_failures",
+      "dimensions": {
+        "device_cohort": "4g-smartphones",
+        "customer_segment": "consumer",
+        "service_type": "lte-attach"
+      },
+      "timestamp": "2026-05-02T14:14:00Z"
+    }
+  ],
+  "feature_windows": [
+    {
+      "lga_id": "ikeja",
+      "domain": "network",
+      "kpi": "cell_availability_pct",
+      "window_minutes": 15,
+      "current_value": 72.4,
+      "rolling_mean": 97.9,
+      "rolling_stddev": 4.6,
+      "z_score": -5.54,
+      "delta_pct": -26.05,
+      "anomaly_score": 0.93,
+      "sample_count": 15,
+      "time_to_breach_minutes": 47,
+      "evidence_ids": ["evd:ikeja:network:availability", "evd:ikeja:network:dropped_calls"],
+      "updated_at": "2026-05-02T14:15:00Z"
+    },
+    {
+      "lga_id": "ikeja",
+      "domain": "bts",
+      "kpi": "site_availability_pct",
+      "window_minutes": 15,
+      "current_value": 61.5,
+      "rolling_mean": 98.6,
+      "rolling_stddev": 5.8,
+      "z_score": -6.4,
+      "delta_pct": -37.63,
+      "anomaly_score": 0.95,
+      "sample_count": 15,
+      "time_to_breach_minutes": 49,
+      "evidence_ids": ["evd:ikeja:bts:availability", "evd:ikeja:bts:dropped_calls"],
+      "updated_at": "2026-05-02T14:15:00Z"
+    },
+    {
+      "lga_id": "ikeja",
+      "domain": "billing",
+      "kpi": "failed_rating_events",
+      "window_minutes": 30,
+      "current_value": 12840,
+      "rolling_mean": 880,
+      "rolling_stddev": 1320,
+      "z_score": 9.06,
+      "delta_pct": 1359.09,
+      "anomaly_score": 0.86,
+      "sample_count": 30,
+      "time_to_breach_minutes": 61,
+      "evidence_ids": ["evd:ikeja:billing:failed_rating", "evd:ikeja:billing:leakage"],
+      "updated_at": "2026-05-02T14:15:00Z"
+    },
+    {
+      "lga_id": "ikeja",
+      "domain": "sales",
+      "kpi": "activation_success_rate_pct",
+      "window_minutes": 30,
+      "current_value": 58.0,
+      "rolling_mean": 95.2,
+      "rolling_stddev": 7.2,
+      "z_score": -5.17,
+      "delta_pct": -39.08,
+      "anomaly_score": 0.79,
+      "sample_count": 30,
+      "time_to_breach_minutes": 74,
+      "evidence_ids": ["evd:ikeja:sales:activations", "evd:ikeja:sales:b2b_orders"],
+      "updated_at": "2026-05-02T14:15:00Z"
+    },
+    {
+      "lga_id": "ikeja",
+      "domain": "recharge",
+      "kpi": "recharge_success_rate_pct",
+      "window_minutes": 30,
+      "current_value": 68.1,
+      "rolling_mean": 98.2,
+      "rolling_stddev": 6.5,
+      "z_score": -4.63,
+      "delta_pct": -30.65,
+      "anomaly_score": 0.77,
+      "sample_count": 30,
+      "time_to_breach_minutes": 69,
+      "evidence_ids": ["evd:ikeja:recharge:success"],
+      "updated_at": "2026-05-02T14:15:00Z"
+    },
+    {
+      "lga_id": "ikeja",
+      "domain": "complaints",
+      "kpi": "complaint_volume",
+      "window_minutes": 15,
+      "current_value": 842,
+      "rolling_mean": 136,
+      "rolling_stddev": 98,
+      "z_score": 7.2,
+      "delta_pct": 519.12,
+      "anomaly_score": 0.92,
+      "sample_count": 15,
+      "time_to_breach_minutes": 38,
+      "evidence_ids": ["evd:ikeja:complaints:volume"],
+      "updated_at": "2026-05-02T14:15:00Z"
+    },
+    {
+      "lga_id": "ikeja",
+      "domain": "device_sessions",
+      "kpi": "session_failure_rate_pct",
+      "window_minutes": 15,
+      "current_value": 27.4,
+      "rolling_mean": 3.4,
+      "rolling_stddev": 5.1,
+      "z_score": 4.71,
+      "delta_pct": 705.88,
+      "anomaly_score": 0.89,
+      "sample_count": 15,
+      "time_to_breach_minutes": 42,
+      "evidence_ids": ["evd:ikeja:device_sessions:session_failures", "evd:ikeja:device_sessions:attach_failures"],
+      "updated_at": "2026-05-02T14:15:00Z"
+    }
+  ],
+  "signal_evidence": [
+    {
+      "evidence_id": "evd:ikeja:network:availability",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "network",
+      "kpi": "cell_availability_pct",
+      "current_value": 72.4,
+      "baseline_value": 98.7,
+      "delta_pct": -26.65,
+      "anomaly_score": 0.93,
+      "severity_hint": "critical",
+      "summary": "Cell availability in Ikeja has fallen from the normal 98.7% baseline to 72.4%, indicating broad access degradation before full breach.",
+      "source_system": "nms",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-network-001"],
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "site_id": "SITE-IKEJA-014",
+        "bts_id": "BTS-IKEJA-014",
+        "service_type": "voice-data"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:network:dropped_calls",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "network",
+      "kpi": "dropped_call_rate_pct",
+      "current_value": 18.6,
+      "baseline_value": 1.8,
+      "delta_pct": 933.33,
+      "anomaly_score": 0.9,
+      "severity_hint": "critical",
+      "summary": "Dropped-call rate has spiked from 1.8% to 18.6%, confirming that live sessions are already failing materially across the Ikeja cluster.",
+      "source_system": "nms",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-network-002"],
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "site_id": "SITE-IKEJA-014",
+        "bts_id": "BTS-IKEJA-014",
+        "service_type": "voice"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:bts:availability",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "bts",
+      "kpi": "site_availability_pct",
+      "current_value": 61.5,
+      "baseline_value": 99.2,
+      "delta_pct": -38.0,
+      "anomaly_score": 0.95,
+      "severity_hint": "critical",
+      "summary": "Multiple BTS sites in Ikeja have collapsed from 99.2% to 61.5% availability, matching a cluster-wide outage pattern rather than a single-cell issue.",
+      "source_system": "bts-telemetry",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-bts-001", "evt-ikeja-bts-002"],
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "site_id": "SITE-IKEJA-014",
+        "bts_id": "BTS-IKEJA-014"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:billing:failed_rating",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "billing",
+      "kpi": "failed_rating_events",
+      "current_value": 12840,
+      "baseline_value": 640,
+      "delta_pct": 1906.25,
+      "anomaly_score": 0.86,
+      "severity_hint": "high",
+      "summary": "Failed rating events rose from 640 to 12,840 in the last 30 minutes, indicating charging degradation and immediate revenue-assurance exposure.",
+      "source_system": "charging-gw",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-billing-001"],
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "customer_segment": "consumer",
+        "service_type": "prepaid-billing"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:billing:leakage",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "billing",
+      "kpi": "revenue_leakage_anomaly_score",
+      "current_value": 0.86,
+      "baseline_value": 0.11,
+      "delta_pct": 681.82,
+      "anomaly_score": 0.86,
+      "severity_hint": "high",
+      "summary": "Revenue-leakage anomaly score has climbed to 0.86, which is well above the 0.45 escalation threshold for incident-time revenue controls.",
+      "source_system": "revenue-assurance",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-billing-002"],
+      "dimensions": {
+        "cluster_id": "IKJ-CLUSTER-01",
+        "customer_segment": "consumer",
+        "service_type": "postpaid-billing"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:sales:activations",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "sales",
+      "kpi": "activation_success_rate_pct",
+      "current_value": 58.0,
+      "baseline_value": 96.4,
+      "delta_pct": -39.83,
+      "anomaly_score": 0.79,
+      "severity_hint": "high",
+      "summary": "Activation success rate has dropped to 58.0% across Ikeja retail channels, meaning sales-side conversions are being lost during the incident window.",
+      "source_system": "crm-sales",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-sales-001"],
+      "dimensions": {
+        "channel_id": "retail-store",
+        "dealer_id": "DLR-IKEJA-004",
+        "customer_segment": "consumer"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:sales:b2b_orders",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "sales",
+      "kpi": "b2b_order_failure_rate_pct",
+      "current_value": 22.0,
+      "baseline_value": 1.3,
+      "delta_pct": 1592.31,
+      "anomaly_score": 0.81,
+      "severity_hint": "high",
+      "summary": "Enterprise order failure rate has reached 22.0%, showing that B2B provisioning and order completion flows are failing alongside the outage.",
+      "source_system": "enterprise-crm",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-sales-002"],
+      "dimensions": {
+        "enterprise_account_id": "ENT-IKEJA-117",
+        "channel_id": "b2b-digital",
+        "customer_segment": "enterprise"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:recharge:success",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "recharge",
+      "kpi": "recharge_success_rate_pct",
+      "current_value": 68.1,
+      "baseline_value": 99.0,
+      "delta_pct": -31.21,
+      "anomaly_score": 0.77,
+      "severity_hint": "high",
+      "summary": "Recharge success rate has fallen to 68.1%, confirming commercial disruption beyond core network KPIs and raising missed-top-up risk.",
+      "source_system": "recharge-switch",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-recharge-001"],
+      "dimensions": {
+        "channel_id": "ussd",
+        "customer_segment": "consumer",
+        "service_type": "airtime-recharge"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:complaints:volume",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "complaints",
+      "kpi": "complaint_volume",
+      "current_value": 842,
+      "baseline_value": 118,
+      "delta_pct": 613.56,
+      "anomaly_score": 0.92,
+      "severity_hint": "critical",
+      "summary": "Complaint intake surged to 842 tickets versus a 118 baseline, which confirms customers are already experiencing visible service harm.",
+      "source_system": "cx-desk",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-complaints-001"],
+      "dimensions": {
+        "channel_id": "contact-center",
+        "customer_segment": "consumer",
+        "service_type": "complaint-intake"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:device_sessions:session_failures",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "device_sessions",
+      "kpi": "session_failure_rate_pct",
+      "current_value": 27.4,
+      "baseline_value": 2.8,
+      "delta_pct": 878.57,
+      "anomaly_score": 0.89,
+      "severity_hint": "critical",
+      "summary": "Session failure rate climbed from 2.8% to 27.4%, confirming that subscribers are unable to keep data sessions alive across Ikeja.",
+      "source_system": "core-network",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-device-001"],
+      "dimensions": {
+        "device_cohort": "4g-smartphones",
+        "customer_segment": "consumer",
+        "service_type": "mobile-data"
+      }
+    },
+    {
+      "evidence_id": "evd:ikeja:device_sessions:attach_failures",
+      "lga_id": "ikeja",
+      "incident_id": "INC-2025-IKEJA-001",
+      "domain": "device_sessions",
+      "kpi": "attach_failure_rate_pct",
+      "current_value": 11.6,
+      "baseline_value": 0.9,
+      "delta_pct": 1188.89,
+      "anomaly_score": 0.84,
+      "severity_hint": "high",
+      "summary": "Attach failures rose to 11.6%, showing fresh sessions are also failing to establish and reinforcing the breadth of user-impact.",
+      "source_system": "core-network",
+      "timestamp": "2026-05-02T14:15:00Z",
+      "related_event_ids": ["evt-ikeja-device-002"],
+      "dimensions": {
+        "device_cohort": "4g-smartphones",
+        "customer_segment": "consumer",
+        "service_type": "lte-attach"
+      }
+    }
+  ],
+  "risk_scores": [
+    {
+      "lga_id": "ikeja",
+      "score": 87.0,
+      "severity": "red",
+      "confidence": 0.91,
+      "time_to_breach_minutes": 47,
+      "updated_at": "2026-05-02T14:15:00Z"
+    }
+  ],
+  "incidents": [
+    {
+      "incident_id": "INC-2025-IKEJA-001",
+      "lga_id": "ikeja",
+      "cause": "network outage",
+      "phase": "active",
+      "opened_at": "2026-05-02T14:00:00Z",
+      "impact": {
+        "affected_subscribers": 18420,
+        "enterprise_lines": 312,
+        "revenue_at_risk_ngn": 8700000.0,
+        "compensation_exposure_ngn": 2100000.0,
+        "ncc_exposure_summary": "NCC exposure is elevated if service restoration slips beyond the current 47-minute breach window."
+      }
+    }
+  ],
+  "mitigation_playbooks": [
+    {
+      "risk_type": "network_outage",
+      "options": [
+        {
+          "action_id": "reroute_traffic",
+          "name": "Reroute traffic",
+          "description": "Shift traffic to neighboring cells and alternate backbone paths while protecting enterprise VPN priority flows.",
+          "expected_risk_delta": 22.0,
+          "estimated_cost_ngn": 250000.0,
+          "time_to_effect_minutes": 15,
+          "side_effects": ["Temporary congestion in neighboring cluster", "Lower throughput for non-critical sessions"],
+          "source_playbook": "demo-network-outage"
+        },
+        {
+          "action_id": "dispatch_field_team",
+          "name": "Dispatch field team",
+          "description": "Send field engineers to the affected BTS and backhaul path to inspect power, fiber, and transmission stability.",
+          "expected_risk_delta": 18.0,
+          "estimated_cost_ngn": 600000.0,
+          "time_to_effect_minutes": 45,
+          "side_effects": ["Slower time to effect", "Requires field access and standby crew"],
+          "source_playbook": "demo-network-outage"
+        }
+      ]
+    }
+  ],
+  "action_simulations": [
+    {
+      "incident_id": "INC-2025-IKEJA-001",
+      "do_nothing_curve": [87.0, 89.0, 91.0, 93.0],
+      "actions": [
+        {
+          "action_id": "reroute_traffic",
+          "projected_score_curve": [82.0, 71.0, 58.0, 46.0],
+          "confidence": 0.87,
+          "time_to_effect_minutes": 15
+        },
+        {
+          "action_id": "dispatch_field_team",
+          "projected_score_curve": [84.0, 76.0, 68.0, 55.0],
+          "confidence": 0.74,
+          "time_to_effect_minutes": 45
+        }
+      ]
+    }
+  ],
+  "audit_log_entries": [],
+  "ncc_packs": [
+    {
+      "incident": {
+        "incident_id": "INC-2025-IKEJA-001",
+        "lga_id": "ikeja",
+        "cause": "network outage",
+        "phase": "active",
+        "opened_at": "2026-05-02T14:00:00Z",
+        "impact": {
+          "affected_subscribers": 18420,
+          "enterprise_lines": 312,
+          "revenue_at_risk_ngn": 8700000.0,
+          "compensation_exposure_ngn": 2100000.0,
+          "ncc_exposure_summary": "NCC exposure is elevated if service restoration slips beyond the current 47-minute breach window."
+        }
+      },
+      "timeline": [
+        "14:00 UTC - Cross-domain anomaly cluster opened in Ikeja.",
+        "14:03 UTC - Cell availability and BTS availability breached critical thresholds.",
+        "14:08 UTC - Billing and recharge degradation confirmed.",
+        "14:13 UTC - Complaint and device-session spikes confirmed customer impact."
+      ],
+      "affected_services": ["Voice", "Mobile Data", "Recharge", "Enterprise Provisioning"],
+      "kpis": {
+        "risk_score": 87.0,
+        "time_to_breach_minutes": 47.0,
+        "cell_availability_pct": 72.4,
+        "site_availability_pct": 61.5
+      },
+      "impacted_subscribers": 18420,
+      "root_cause": "Cluster-wide network outage pattern centered on Ikeja BTS availability collapse with correlated charging and customer-experience degradation.",
+      "corrective_actions": [
+        "Reroute traffic to neighboring cells and protected backbone paths.",
+        "Dispatch field team to inspect power and backhaul stability."
+      ],
+      "approval_history": [],
+      "evidence_logs": [
+        "evd:ikeja:network:availability",
+        "evd:ikeja:bts:availability",
+        "evd:ikeja:billing:failed_rating",
+        "evd:ikeja:complaints:volume",
+        "evd:ikeja:device_sessions:session_failures"
+      ]
+    }
+  ]
+}

@@ -347,6 +347,7 @@ If you are about to break one of these to ship faster, stop and escalate.
 
 - [`Comprehensive reqs.md`](./Comprehensive%20reqs.md) — what users must be able to do; non-functional targets.
 - [`MVP_PLAN.md`](./MVP_PLAN.md) — full scope, capacity, day-by-day plan, agent runtime details, cut line.
+- [`ENGINEER4_PLAN.md`](./ENGINEER4_PLAN.md) — detailed wake-on-signal copilot implementation plan, tool contracts, trigger flow, and execution order for Engineer 4.
 - [`docs/architecture/mvp_engineering_domains.md`](architecture/mvp_engineering_domains.md) — per-domain component lists.
 - `docs/architecture/riskguard-mvp-engineering-domains.excalidraw` — visual ownership view.
 - `docs/architecture/riskguard-modules-classes.excalidraw` — module and class interaction view.
