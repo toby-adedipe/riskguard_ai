@@ -1,11 +1,6 @@
-import DemoPage from './DemoPage'
 import './App.css'
 
 function App() {
-  if (window.location.pathname === '/demo') {
-    return <DemoPage />
-  }
-
   return (
     <main className="home-shell">
       <section className="home-hero">
@@ -18,9 +13,6 @@ function App() {
             follow-up questions.
           </p>
         </div>
-        <a className="home-action" href="/demo">
-          Open Copilot Demo
-        </a>
       </section>
     </main>
   )
