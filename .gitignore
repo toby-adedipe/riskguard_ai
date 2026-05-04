@@ -1,3 +1,4 @@
 .claude
 ENGINEER_1_EXECUTION_PLAN.md
 *.parquet
+*.pyc
