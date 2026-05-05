@@ -2,3 +2,7 @@
 ENGINEER_1_EXECUTION_PLAN.md
 *.parquet
 *.pyc
+.DS_Store
+node_modules/
+dist/
+build/

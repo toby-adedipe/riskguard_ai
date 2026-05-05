@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from io import BytesIO
 from datetime import datetime, timezone
-from zipfile import ZipFile
 from unittest.mock import patch
 
 from fastapi import HTTPException
@@ -78,7 +76,7 @@ class CopilotServiceBoundaryTestCase(unittest.TestCase):
         finally:
             service.close()
 
-    def test_compile_report_document_returns_downloadable_docx(self) -> None:
+    def test_compile_report_document_returns_downloadable_pdf(self) -> None:
         service = self._build_offline_service()
         try:
             report = service.investigate(self._trigger())
@@ -87,20 +85,10 @@ class CopilotServiceBoundaryTestCase(unittest.TestCase):
 
             self.assertIsNotNone(document)
             assert document is not None
-            self.assertEqual(document.media_type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            self.assertTrue(document.filename.endswith(".docx"))
+            self.assertEqual(document.media_type, "application/pdf")
+            self.assertTrue(document.filename.endswith(".pdf"))
             self.assertGreater(len(document.content), 1000)
-            self.assertTrue(document.content.startswith(b"PK"))
-            with ZipFile(BytesIO(document.content)) as archive:
-                names = set(archive.namelist())
-                self.assertIn("word/styles.xml", names)
-                self.assertIn("word/numbering.xml", names)
-                document_xml = archive.read("word/document.xml").decode("utf-8")
-                styles_xml = archive.read("word/styles.xml").decode("utf-8")
-            self.assertIn("RiskGuard AI", document_xml)
-            self.assertIn("Executive Summary", document_xml)
-            self.assertIn('w:type="page"', document_xml)
-            self.assertIn("ReportKicker", styles_xml)
+            self.assertTrue(document.content.startswith(b"%PDF"))
         finally:
             service.close()
 
@@ -125,9 +113,9 @@ class CopilotServiceBoundaryTestCase(unittest.TestCase):
 
             self.assertIsNotNone(document)
             assert document is not None
-            self.assertEqual(document.media_type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            self.assertEqual(document.media_type, "application/pdf")
             self.assertGreater(len(document.content), 1000)
-            self.assertTrue(document.content.startswith(b"PK"))
+            self.assertTrue(document.content.startswith(b"%PDF"))
             self.assertEqual(failing_runner.calls, 0)
         finally:
             service.close()

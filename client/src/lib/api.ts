@@ -270,10 +270,14 @@ export async function downloadInvestigationDocument(harnessRunId: string): Promi
   const response = await api.get<Blob>(`/copilot/investigations/${harnessRunId}/document`, {
     responseType: "blob",
   });
+  const disposition = response.headers["content-disposition"] as string | undefined;
+  const filename =
+    disposition?.match(/filename="([^"]+)"/)?.[1] ??
+    `riskguard-investigation-${harnessRunId}.pdf`;
   const url = window.URL.createObjectURL(response.data);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `riskguard-investigation-${harnessRunId}.docx`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();

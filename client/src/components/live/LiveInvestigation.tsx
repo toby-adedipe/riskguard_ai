@@ -999,7 +999,7 @@ function FinalReportBanner({
             className="mt-auto mb-2 px-4 py-2 border border-blue-200 bg-white hover:bg-blue-50 disabled:opacity-50 text-blue-700 font-semibold text-xs rounded transition-colors flex items-center justify-center gap-1.5"
           >
             <Download size={13} />
-            {documentMutation.isPending ? "Compiling report..." : "Download report"}
+            {documentMutation.isPending ? "Compiling PDF..." : "Download PDF"}
           </button>
           <button
             onClick={() => approveMutation.mutate()}

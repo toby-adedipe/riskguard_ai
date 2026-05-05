@@ -6,10 +6,26 @@ from dataclasses import dataclass
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_RIGHT
+from reportlab.lib.pagesizes import LETTER
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    KeepTogether,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
 from app.modules.copilot.harness import HarnessRunReport
 
 
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+PDF_MEDIA_TYPE = "application/pdf"
 
 
 @dataclass(frozen=True)
@@ -22,9 +38,9 @@ class CompiledReportDocument:
 def build_compiled_report_document(report: HarnessRunReport) -> CompiledReportDocument:
     title, body = report_markdown(report)
     return CompiledReportDocument(
-        filename=f"riskguard-investigation-{report.harness_run_id}.docx",
-        media_type=DOCX_MEDIA_TYPE,
-        content=build_report_docx(title=title, body_markdown=body),
+        filename=f"riskguard-investigation-{report.harness_run_id}.pdf",
+        media_type=PDF_MEDIA_TYPE,
+        content=build_report_pdf(title=title, body_markdown=body),
     )
 
 
@@ -105,10 +121,253 @@ def build_report_docx(*, title: str, body_markdown: str) -> bytes:
         archive.writestr("word/_rels/document.xml.rels", _document_rels_xml())
         archive.writestr("word/styles.xml", _styles_xml())
         archive.writestr("word/numbering.xml", _numbering_xml())
+        archive.writestr("word/header1.xml", _header_xml())
+        archive.writestr("word/footer1.xml", _footer_xml())
         archive.writestr("word/document.xml", document_xml)
         archive.writestr("docProps/core.xml", _core_props_xml(title))
         archive.writestr("docProps/app.xml", _app_props_xml())
     return buffer.getvalue()
+
+
+def build_report_pdf(*, title: str, body_markdown: str) -> bytes:
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=LETTER,
+        rightMargin=0.72 * inch,
+        leftMargin=0.72 * inch,
+        topMargin=0.78 * inch,
+        bottomMargin=0.72 * inch,
+        title=title,
+        author="RiskGuard AI",
+    )
+    styles = _pdf_styles()
+    story = _markdown_to_pdf_story(title, body_markdown, styles)
+    doc.build(story, onFirstPage=_draw_pdf_frame, onLaterPages=_draw_pdf_frame)
+    return buffer.getvalue()
+
+
+def _markdown_to_pdf_story(title: str, markdown: str, styles: dict[str, ParagraphStyle]) -> list:
+    story: list = [
+        Paragraph("RISKGUARD AI / OPERATIONAL COMMAND", styles["kicker"]),
+        Spacer(1, 0.12 * inch),
+        Paragraph(_pdf_escape(title), styles["title"]),
+        Spacer(1, 0.08 * inch),
+        Paragraph(
+            "Network incident handover report for executive, NOC, compliance, and revenue assurance review.",
+            styles["subtitle"],
+        ),
+        Spacer(1, 0.06 * inch),
+        _summary_strip("Generated from validated investigation evidence and mitigation simulations.", styles),
+        Spacer(1, 0.24 * inch),
+    ]
+    current_heading: str | None = None
+    first_body_in_section = False
+    pending_page_break = False
+    for raw_line in markdown.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line == "---PAGE BREAK---":
+            pending_page_break = True
+            continue
+        if pending_page_break:
+            story.append(PageBreak())
+            pending_page_break = False
+        if line.startswith("# "):
+            current_heading = line[2:]
+            first_body_in_section = True
+            story.append(Spacer(1, 0.14 * inch))
+            story.append(Paragraph(_pdf_escape(current_heading), styles["heading"]))
+            story.append(Spacer(1, 0.05 * inch))
+            continue
+        if line.startswith("## "):
+            current_heading = line[3:]
+            first_body_in_section = True
+            story.append(Paragraph(_pdf_escape(current_heading), styles["subheading"]))
+            continue
+        if line.startswith("- "):
+            story.append(Paragraph(_pdf_inline(line[2:]), styles["bullet"], bulletText="-"))
+            continue
+        if current_heading == "Recommended Decision":
+            story.append(_decision_callout(_pdf_inline(line), styles))
+        elif current_heading == "Executive Summary" and first_body_in_section:
+            story.append(_executive_callout(_pdf_inline(line), styles))
+        else:
+            story.append(Paragraph(_pdf_inline(line), styles["body"]))
+        first_body_in_section = False
+    return story
+
+
+def _pdf_styles() -> dict[str, ParagraphStyle]:
+    base = getSampleStyleSheet()
+    return {
+        "kicker": ParagraphStyle(
+            "RiskGuardKicker",
+            parent=base["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=9.5,
+            leading=12,
+            textColor=colors.HexColor("#1D4ED8"),
+            spaceAfter=2,
+            tracking=1.4,
+        ),
+        "title": ParagraphStyle(
+            "RiskGuardTitle",
+            parent=base["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=27,
+            leading=31,
+            textColor=colors.HexColor("#0B1220"),
+            spaceAfter=4,
+        ),
+        "subtitle": ParagraphStyle(
+            "RiskGuardSubtitle",
+            parent=base["Normal"],
+            fontName="Helvetica",
+            fontSize=13.5,
+            leading=17,
+            textColor=colors.HexColor("#334155"),
+        ),
+        "body": ParagraphStyle(
+            "RiskGuardBody",
+            parent=base["BodyText"],
+            fontName="Helvetica",
+            fontSize=10.2,
+            leading=14.2,
+            textColor=colors.HexColor("#1E293B"),
+            spaceAfter=7,
+        ),
+        "lead": ParagraphStyle(
+            "RiskGuardLead",
+            parent=base["BodyText"],
+            fontName="Helvetica",
+            fontSize=11.8,
+            leading=16,
+            textColor=colors.HexColor("#0F172A"),
+        ),
+        "heading": ParagraphStyle(
+            "RiskGuardHeading",
+            parent=base["Heading1"],
+            fontName="Helvetica-Bold",
+            fontSize=15.2,
+            leading=18,
+            textColor=colors.HexColor("#0B1220"),
+            spaceBefore=7,
+            spaceAfter=6,
+        ),
+        "subheading": ParagraphStyle(
+            "RiskGuardSubheading",
+            parent=base["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=12.5,
+            leading=15,
+            textColor=colors.HexColor("#1E3A8A"),
+            spaceBefore=7,
+            spaceAfter=4,
+        ),
+        "bullet": ParagraphStyle(
+            "RiskGuardBullet",
+            parent=base["BodyText"],
+            fontName="Helvetica",
+            fontSize=9.5,
+            leading=12.8,
+            textColor=colors.HexColor("#334155"),
+            leftIndent=14,
+            bulletIndent=2,
+            spaceAfter=3.5,
+        ),
+        "small": ParagraphStyle(
+            "RiskGuardSmall",
+            parent=base["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=11,
+            textColor=colors.HexColor("#64748B"),
+        ),
+        "footer": ParagraphStyle(
+            "RiskGuardFooter",
+            parent=base["Normal"],
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            textColor=colors.HexColor("#64748B"),
+            alignment=TA_RIGHT,
+        ),
+    }
+
+
+def _summary_strip(text: str, styles: dict[str, ParagraphStyle]) -> Table:
+    table = Table([[Paragraph(_pdf_escape(text), styles["small"])]], colWidths=[6.95 * inch])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#DBEAFE")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 9),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
+    return table
+
+
+def _executive_callout(text: str, styles: dict[str, ParagraphStyle]) -> Table:
+    table = Table([[Paragraph(text, styles["lead"])]], colWidths=[6.95 * inch])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                ("LINEBEFORE", (0, 0), (-1, -1), 4, colors.HexColor("#2563EB")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 9),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+            ]
+        )
+    )
+    return table
+
+
+def _decision_callout(text: str, styles: dict[str, ParagraphStyle]) -> KeepTogether:
+    table = Table([[Paragraph(text, styles["body"])]], colWidths=[6.95 * inch])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#ECFDF5")),
+                ("LINEBEFORE", (0, 0), (-1, -1), 4, colors.HexColor("#059669")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+    return KeepTogether([table, Spacer(1, 0.05 * inch)])
+
+
+def _draw_pdf_frame(canvas, doc) -> None:
+    canvas.saveState()
+    width, height = LETTER
+    canvas.setStrokeColor(colors.HexColor("#DBEAFE"))
+    canvas.setLineWidth(0.7)
+    canvas.line(doc.leftMargin, height - 0.52 * inch, width - doc.rightMargin, height - 0.52 * inch)
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(colors.HexColor("#64748B"))
+    canvas.drawString(doc.leftMargin, height - 0.44 * inch, "RISKGUARD AI INVESTIGATION REPORT")
+    canvas.drawRightString(width - doc.rightMargin, 0.42 * inch, f"Page {doc.page}")
+    canvas.restoreState()
+
+
+def _pdf_escape(text: str) -> str:
+    return html.escape(text, quote=False)
+
+
+def _pdf_inline(text: str) -> str:
+    escaped = _pdf_escape(text)
+    return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
 
 
 def _markdown_list(items: list[str]) -> str:
@@ -119,40 +378,62 @@ def _markdown_list(items: list[str]) -> str:
 
 def _markdown_to_docx_paragraphs(title: str, markdown: str) -> list[str]:
     paragraphs = [
-        _paragraph("RiskGuard AI", style="ReportKicker"),
-        _paragraph(title, style="Title"),
-        _paragraph("Operational incident handover report", style="Subtitle"),
-        _paragraph("", style="Body"),
+        _paragraph("RISKGUARD AI / OPERATIONAL COMMAND", style="CoverKicker"),
+        _paragraph(title, style="CoverTitle"),
+        _paragraph("Network incident handover report for executive, NOC, compliance, and revenue assurance review.", style="CoverSubtitle"),
+        _paragraph("Generated from validated investigation evidence and mitigation simulations.", style="CoverMeta"),
     ]
+    current_heading: str | None = None
+    first_body_in_section = False
+    pending_page_break = False
     for raw_line in markdown.splitlines():
         line = raw_line.strip()
         if not line:
             continue
         if line == "---PAGE BREAK---":
-            paragraphs.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
+            pending_page_break = True
             continue
         if line.startswith("# "):
-            paragraphs.append(_paragraph(line[2:], style="Heading1"))
+            current_heading = line[2:]
+            first_body_in_section = True
+            paragraphs.append(_paragraph(current_heading, style="SectionHeading", page_break_before=pending_page_break))
+            pending_page_break = False
             continue
         if line.startswith("## "):
-            paragraphs.append(_paragraph(line[3:], style="Heading2"))
+            current_heading = line[3:]
+            first_body_in_section = True
+            paragraphs.append(_paragraph(current_heading, style="Subheading", page_break_before=pending_page_break))
+            pending_page_break = False
             continue
         if line.startswith("- "):
             paragraphs.append(_paragraph(f"- {line[2:]}", style="ListParagraph"))
             continue
-        paragraphs.append(_paragraph(line, style="Body"))
+        style = "ExecutiveLead" if current_heading == "Executive Summary" and first_body_in_section else "BodyText"
+        if current_heading == "Recommended Decision":
+            style = "DecisionCallout"
+        paragraphs.append(_paragraph(line, style=style))
+        first_body_in_section = False
     return paragraphs
 
 
-def _paragraph(text: str, *, style: str | None = None, num_id: int | None = None) -> str:
-    p_pr = _paragraph_properties(style=style, num_id=num_id)
-    return f"<w:p>{p_pr}{''.join(_runs(text))}</w:p>"
+def _paragraph(
+    text: str,
+    *,
+    style: str | None = None,
+    num_id: int | None = None,
+    page_break_before: bool = False,
+) -> str:
+    p_pr = _paragraph_properties(style=style, num_id=num_id, page_break_before=page_break_before)
+    return f"<w:p>{p_pr}{''.join(_runs(text, style=style))}</w:p>"
 
 
-def _paragraph_properties(*, style: str | None, num_id: int | None) -> str:
+def _paragraph_properties(*, style: str | None, num_id: int | None, page_break_before: bool = False) -> str:
     children: list[str] = []
     if style:
         children.append(f"<w:pStyle w:val=\"{style}\"/>")
+    if page_break_before:
+        children.append("<w:pageBreakBefore/>")
+    children.extend(_direct_paragraph_properties(style))
     if num_id is not None:
         children.append(
             f"<w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"{num_id}\"/></w:numPr>"
@@ -162,34 +443,128 @@ def _paragraph_properties(*, style: str | None, num_id: int | None) -> str:
     return f"<w:pPr>{''.join(children)}</w:pPr>"
 
 
-def _runs(text: str) -> list[str]:
+def _direct_paragraph_properties(style: str | None) -> list[str]:
+    if style == "CoverKicker":
+        return [
+            '<w:spacing w:before="100" w:after="140"/>',
+            '<w:shd w:val="clear" w:color="auto" w:fill="EAF2FF"/>',
+            '<w:pBdr><w:left w:val="single" w:sz="18" w:space="6" w:color="2563EB"/></w:pBdr>',
+        ]
+    if style == "CoverTitle":
+        return [
+            '<w:spacing w:before="80" w:after="180"/>',
+            '<w:pBdr><w:bottom w:val="single" w:sz="12" w:space="12" w:color="2563EB"/></w:pBdr>',
+        ]
+    if style == "CoverSubtitle":
+        return ['<w:spacing w:after="120" w:line="300" w:lineRule="auto"/>']
+    if style == "CoverMeta":
+        return [
+            '<w:spacing w:after="420"/>',
+            '<w:pBdr><w:bottom w:val="single" w:sz="4" w:space="14" w:color="CBD5E1"/></w:pBdr>',
+        ]
+    if style == "ExecutiveLead":
+        return [
+            '<w:spacing w:before="80" w:after="220" w:line="320" w:lineRule="auto"/>',
+            '<w:shd w:val="clear" w:color="auto" w:fill="F8FAFC"/>',
+            '<w:pBdr><w:left w:val="single" w:sz="14" w:space="8" w:color="2563EB"/></w:pBdr>',
+        ]
+    if style == "DecisionCallout":
+        return [
+            '<w:spacing w:before="80" w:after="160" w:line="300" w:lineRule="auto"/>',
+            '<w:shd w:val="clear" w:color="auto" w:fill="ECFDF5"/>',
+            '<w:pBdr><w:left w:val="single" w:sz="14" w:space="8" w:color="059669"/></w:pBdr>',
+        ]
+    if style == "ListParagraph":
+        return ['<w:spacing w:after="90" w:line="280" w:lineRule="auto"/>', '<w:ind w:left="360"/>']
+    if style == "SectionHeading":
+        return [
+            '<w:keepNext/>',
+            '<w:spacing w:before="340" w:after="120"/>',
+            '<w:pBdr><w:bottom w:val="single" w:sz="5" w:space="6" w:color="BFDBFE"/></w:pBdr>',
+            '<w:outlineLvl w:val="0"/>',
+        ]
+    if style == "Subheading":
+        return ['<w:keepNext/>', '<w:spacing w:before="220" w:after="80"/>', '<w:outlineLvl w:val="1"/>']
+    return ['<w:spacing w:after="150" w:line="300" w:lineRule="auto"/>']
+
+
+def _runs(text: str, *, style: str | None) -> list[str]:
     if text == "":
-        return ["<w:r><w:t></w:t></w:r>"]
+        return [f"<w:r>{_run_properties(style=style)}<w:t></w:t></w:r>"]
     runs: list[str] = []
     cursor = 0
     for match in re.finditer(r"\*\*(.+?)\*\*", text):
         if match.start() > cursor:
-            runs.append(_run(text[cursor:match.start()]))
-        runs.append(_run(match.group(1), bold=True))
+            runs.append(_run(text[cursor:match.start()], style=style))
+        runs.append(_run(match.group(1), style=style, bold=True))
         cursor = match.end()
     if cursor < len(text):
-        runs.append(_run(text[cursor:]))
+        runs.append(_run(text[cursor:], style=style))
     return runs
 
 
-def _run(text: str, *, bold: bool = False) -> str:
-    run_props = "<w:rPr><w:b/></w:rPr>" if bold else ""
+def _run(text: str, *, style: str | None, bold: bool = False) -> str:
+    run_props = _run_properties(style=style, bold=bold)
     return f"<w:r>{run_props}<w:t xml:space=\"preserve\">{html.escape(text)}</w:t></w:r>"
+
+
+def _run_properties(*, style: str | None, bold: bool = False) -> str:
+    font = "Helvetica Neue"
+    size = "21"
+    color = "1E293B"
+    props = []
+    if style == "CoverKicker":
+        size = "18"
+        color = "1D4ED8"
+        props.extend(["<w:b/>", "<w:caps/>", '<w:spacing w:val="28"/>'])
+    elif style == "CoverTitle":
+        size = "44"
+        color = "0B1220"
+        props.append("<w:b/>")
+    elif style == "CoverSubtitle":
+        size = "25"
+        color = "334155"
+    elif style == "CoverMeta":
+        size = "19"
+        color = "64748B"
+    elif style == "ExecutiveLead":
+        size = "24"
+        color = "0F172A"
+    elif style == "DecisionCallout":
+        size = "21"
+        color = "064E3B"
+    elif style == "ListParagraph":
+        size = "20"
+        color = "334155"
+    elif style == "SectionHeading":
+        size = "30"
+        color = "0B1220"
+        props.append("<w:b/>")
+    elif style == "Subheading":
+        size = "24"
+        color = "1E3A8A"
+        props.append("<w:b/>")
+    if bold and "<w:b/>" not in props:
+        props.append("<w:b/>")
+    return (
+        "<w:rPr>"
+        f'<w:rFonts w:ascii="{font}" w:hAnsi="{font}" w:cs="{font}"/>'
+        f'<w:sz w:val="{size}"/><w:color w:val="{color}"/>'
+        + "".join(props)
+        + "</w:rPr>"
+    )
 
 
 def _document_xml(paragraphs: list[str]) -> str:
     return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <w:body>
     {''.join(paragraphs)}
     <w:sectPr>
+      <w:headerReference w:type="default" r:id="rId2"/>
+      <w:footerReference w:type="default" r:id="rId3"/>
       <w:pgSz w:w="12240" w:h="15840"/>
-      <w:pgMar w:top="1080" w:right="1440" w:bottom="1080" w:left="1440" w:header="720" w:footer="720"/>
+      <w:pgMar w:top="1152" w:right="1296" w:bottom="1152" w:left="1296" w:header="576" w:footer="576"/>
       <w:cols w:space="720"/>
       <w:docGrid w:linePitch="360"/>
     </w:sectPr>
@@ -205,6 +580,8 @@ def _content_types_xml() -> str:
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
   <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
   <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
 </Types>"""
@@ -223,6 +600,8 @@ def _document_rels_xml() -> str:
     return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
 </Relationships>"""
 
 
@@ -231,56 +610,100 @@ def _styles_xml() -> str:
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:docDefaults>
     <w:rPrDefault>
-      <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/><w:color w:val="1F2937"/></w:rPr>
+      <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:cs="Aptos"/><w:sz w:val="21"/><w:color w:val="1E293B"/></w:rPr>
     </w:rPrDefault>
     <w:pPrDefault>
-      <w:pPr><w:spacing w:after="160" w:line="276" w:lineRule="auto"/></w:pPr>
+      <w:pPr><w:spacing w:after="150" w:line="300" w:lineRule="auto"/></w:pPr>
     </w:pPrDefault>
   </w:docDefaults>
-  <w:style w:type="paragraph" w:default="1" w:styleId="Body">
-    <w:name w:val="Body"/>
-    <w:pPr><w:spacing w:after="160" w:line="276" w:lineRule="auto"/></w:pPr>
-    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/><w:color w:val="1F2937"/></w:rPr>
+  <w:style w:type="paragraph" w:default="1" w:styleId="BodyText">
+    <w:name w:val="Body Text"/>
+    <w:pPr><w:spacing w:after="150" w:line="300" w:lineRule="auto"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:cs="Aptos"/><w:sz w:val="21"/><w:color w:val="1E293B"/></w:rPr>
   </w:style>
-  <w:style w:type="paragraph" w:styleId="ReportKicker">
-    <w:name w:val="Report Kicker"/>
-    <w:pPr><w:spacing w:before="120" w:after="80"/><w:jc w:val="left"/></w:pPr>
-    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:caps/><w:sz w:val="20"/><w:color w:val="2563EB"/><w:spacing w:val="32"/></w:rPr>
-  </w:style>
-  <w:style w:type="paragraph" w:styleId="Title">
-    <w:name w:val="Title"/>
+  <w:style w:type="paragraph" w:styleId="CoverKicker">
+    <w:name w:val="Cover Kicker"/>
     <w:pPr>
-      <w:spacing w:before="80" w:after="160"/>
-      <w:pBdr><w:bottom w:val="single" w:sz="10" w:space="8" w:color="2563EB"/></w:pBdr>
+      <w:spacing w:before="100" w:after="140"/>
+      <w:shd w:val="clear" w:color="auto" w:fill="EAF2FF"/>
+      <w:pBdr><w:left w:val="single" w:sz="18" w:space="6" w:color="2563EB"/></w:pBdr>
     </w:pPr>
-    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="38"/><w:color w:val="0F172A"/></w:rPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:b/><w:caps/><w:sz w:val="18"/><w:color w:val="1D4ED8"/><w:spacing w:val="28"/></w:rPr>
   </w:style>
-  <w:style w:type="paragraph" w:styleId="Subtitle">
-    <w:name w:val="Subtitle"/>
-    <w:pPr><w:spacing w:after="360"/></w:pPr>
-    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/><w:color w:val="64748B"/></w:rPr>
+  <w:style w:type="paragraph" w:styleId="CoverTitle">
+    <w:name w:val="Cover Title"/>
+    <w:pPr>
+      <w:spacing w:before="80" w:after="180"/>
+      <w:pBdr><w:bottom w:val="single" w:sz="12" w:space="12" w:color="2563EB"/></w:pBdr>
+    </w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos Display" w:hAnsi="Aptos Display"/><w:b/><w:sz w:val="44"/><w:color w:val="0B1220"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="CoverSubtitle">
+    <w:name w:val="Cover Subtitle"/>
+    <w:pPr><w:spacing w:after="120" w:line="300" w:lineRule="auto"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="25"/><w:color w:val="334155"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="CoverMeta">
+    <w:name w:val="Cover Meta"/>
+    <w:pPr><w:spacing w:after="420"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="14" w:color="CBD5E1"/></w:pBdr></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="19"/><w:color w:val="64748B"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="ExecutiveLead">
+    <w:name w:val="Executive Lead"/>
+    <w:basedOn w:val="BodyText"/>
+    <w:pPr>
+      <w:spacing w:before="80" w:after="220" w:line="320" w:lineRule="auto"/>
+      <w:shd w:val="clear" w:color="auto" w:fill="F8FAFC"/>
+      <w:pBdr><w:left w:val="single" w:sz="14" w:space="8" w:color="2563EB"/></w:pBdr>
+    </w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="24"/><w:color w:val="0F172A"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="DecisionCallout">
+    <w:name w:val="Decision Callout"/>
+    <w:basedOn w:val="BodyText"/>
+    <w:pPr>
+      <w:spacing w:before="80" w:after="160" w:line="300" w:lineRule="auto"/>
+      <w:shd w:val="clear" w:color="auto" w:fill="ECFDF5"/>
+      <w:pBdr><w:left w:val="single" w:sz="14" w:space="8" w:color="059669"/></w:pBdr>
+    </w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="21"/><w:color w:val="064E3B"/></w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="ListParagraph">
     <w:name w:val="List Paragraph"/>
-    <w:basedOn w:val="Body"/>
-    <w:pPr><w:spacing w:after="90" w:line="276" w:lineRule="auto"/><w:ind w:left="360"/></w:pPr>
-    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/><w:color w:val="1F2937"/></w:rPr>
+    <w:basedOn w:val="BodyText"/>
+    <w:pPr><w:spacing w:after="90" w:line="280" w:lineRule="auto"/><w:ind w:left="360"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="20"/><w:color w:val="334155"/></w:rPr>
   </w:style>
-  <w:style w:type="paragraph" w:styleId="Heading1">
-    <w:name w:val="heading 1"/>
-    <w:basedOn w:val="Body"/>
-    <w:next w:val="Body"/>
+  <w:style w:type="paragraph" w:styleId="SectionHeading">
+    <w:name w:val="Section Heading"/>
+    <w:basedOn w:val="BodyText"/>
+    <w:next w:val="BodyText"/>
     <w:qFormat/>
-    <w:pPr><w:keepNext/><w:spacing w:before="360" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr>
-    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="30"/><w:color w:val="0F172A"/></w:rPr>
+    <w:pPr>
+      <w:keepNext/>
+      <w:spacing w:before="340" w:after="120"/>
+      <w:pBdr><w:bottom w:val="single" w:sz="5" w:space="6" w:color="BFDBFE"/></w:pBdr>
+      <w:outlineLvl w:val="0"/>
+    </w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos Display" w:hAnsi="Aptos Display"/><w:b/><w:sz w:val="30"/><w:color w:val="0B1220"/></w:rPr>
   </w:style>
-  <w:style w:type="paragraph" w:styleId="Heading2">
-    <w:name w:val="heading 2"/>
-    <w:basedOn w:val="Body"/>
-    <w:next w:val="Body"/>
+  <w:style w:type="paragraph" w:styleId="Subheading">
+    <w:name w:val="Subheading"/>
+    <w:basedOn w:val="BodyText"/>
+    <w:next w:val="BodyText"/>
     <w:qFormat/>
-    <w:pPr><w:keepNext/><w:spacing w:before="240" w:after="100"/><w:outlineLvl w:val="1"/></w:pPr>
-    <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="25"/><w:color w:val="334155"/></w:rPr>
+    <w:pPr><w:keepNext/><w:spacing w:before="220" w:after="80"/><w:outlineLvl w:val="1"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos Display" w:hAnsi="Aptos Display"/><w:b/><w:sz w:val="24"/><w:color w:val="1E3A8A"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="HeaderText">
+    <w:name w:val="Header Text"/>
+    <w:pPr><w:spacing w:after="0"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="4" w:color="DBEAFE"/></w:pBdr></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:caps/><w:sz w:val="16"/><w:color w:val="64748B"/><w:spacing w:val="20"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="FooterText">
+    <w:name w:val="Footer Text"/>
+    <w:pPr><w:spacing w:after="0"/><w:jc w:val="right"/></w:pPr>
+    <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="16"/><w:color w:val="64748B"/></w:rPr>
   </w:style>
 </w:styles>"""
 
@@ -302,6 +725,26 @@ def _numbering_xml() -> str:
   </w:abstractNum>
   <w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
 </w:numbering>"""
+
+
+def _header_xml() -> str:
+    return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:pStyle w:val="HeaderText"/><w:spacing w:after="0"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="4" w:color="DBEAFE"/></w:pBdr></w:pPr>
+    <w:r><w:rPr><w:rFonts w:ascii="Helvetica Neue" w:hAnsi="Helvetica Neue"/><w:caps/><w:sz w:val="16"/><w:color w:val="64748B"/><w:spacing w:val="20"/></w:rPr><w:t xml:space="preserve">RiskGuard AI Investigation Report</w:t></w:r>
+  </w:p>
+</w:hdr>"""
+
+
+def _footer_xml() -> str:
+    return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:pStyle w:val="FooterText"/><w:spacing w:after="0"/><w:jc w:val="right"/></w:pPr>
+    <w:r><w:rPr><w:rFonts w:ascii="Helvetica Neue" w:hAnsi="Helvetica Neue"/><w:sz w:val="16"/><w:color w:val="64748B"/></w:rPr><w:t xml:space="preserve">Internal operational report</w:t></w:r>
+  </w:p>
+</w:ftr>"""
 
 
 def _core_props_xml(title: str) -> str:
