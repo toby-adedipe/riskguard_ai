@@ -43,6 +43,7 @@ from app.modules.compliance.db import CompliancePackRepository
 from app.modules.copilot.db import InvestigationRunRepository
 from app.modules.copilot.harness import HarnessRunReport, InvestigationHarness
 from app.modules.copilot.orchestrator import MainInvestigationAgent
+from app.modules.copilot.report_documents import build_compiled_report_document
 from app.modules.copilot.role_plugins import AgentExecutionContext
 from app.modules.copilot.semantic_runtime import SemanticKernelRoleRunner
 from app.modules.copilot.services import DemoCopilotToolBackend
@@ -161,6 +162,15 @@ _SYNTHESIS_NOTE: dict[str, str] = {
     "investigation_harness": "Harness sweep complete.",
 }
 
+TELEMETRY_TICK_SECONDS = 0.25
+WAKE_PAUSE_SECONDS = 0.35
+NARRATION_PAUSE_SECONDS = 0.55
+ROLE_START_PAUSE_SECONDS = 0.15
+ROLE_COMPLETE_PAUSE_SECONDS = 0.2
+TOOL_CALL_PAUSE_SECONDS = 0.15
+TOOL_RESULT_PAUSE_SECONDS = 0.1
+FACT_PAUSE_SECONDS = 0.08
+
 
 def _fmt_value(domain: str, value: float) -> str:
     metric_name, unit, _, _ = _DOMAIN_METRICS[domain]
@@ -200,7 +210,7 @@ class _InstrumentedToolRegistry(ToolRegistry):
             description=copy,
             args=_summarize_args(args, kwargs),
         )
-        time.sleep(0.7)
+        time.sleep(TOOL_CALL_PAUSE_SECONDS)
         try:
             result = super().call(role, tool_name, *args, **kwargs)
         except Exception as exc:
@@ -218,7 +228,7 @@ class _InstrumentedToolRegistry(ToolRegistry):
             tool=tool_name,
             summary=_summarize_result(tool_name, result),
         )
-        time.sleep(0.4)
+        time.sleep(TOOL_RESULT_PAUSE_SECONDS)
         return result
 
 
@@ -411,7 +421,7 @@ def _run(
                 score=float(score_value),
             )
 
-        time.sleep(0.5)
+        time.sleep(TELEMETRY_TICK_SECONDS)
 
     # Make sure score is at peak.
     risk_repo.upsert(
@@ -457,7 +467,7 @@ def _run(
             "multi-domain anomalies were confirmed. Activating investigation copilot."
         ),
     )
-    time.sleep(0.8)
+    time.sleep(WAKE_PAUSE_SECONDS)
     event_log.append(
         "orchestrator_thought",
         text=(
@@ -468,7 +478,7 @@ def _run(
             "committing to a mitigation."
         ),
     )
-    time.sleep(1.4)
+    time.sleep(NARRATION_PAUSE_SECONDS)
 
     # ---- Phase 3: investigation ---------------------------------------------------
     backend = DemoCopilotToolBackend(
@@ -490,20 +500,20 @@ def _run(
                 role_label=_ROLE_LABEL.get(previous, previous),
                 synthesis=_SYNTHESIS_NOTE.get(previous, ""),
             )
-            time.sleep(0.6)
+            time.sleep(ROLE_COMPLETE_PAUSE_SECONDS)
 
         if new_role in _ROLE_LABEL and new_role not in dispatched:
             dispatched.add(new_role)
             reasoning = _DISPATCH_REASONING.get(new_role)
             if reasoning:
                 event_log.append("orchestrator_thought", text=reasoning, target_role=new_role)
-                time.sleep(1.4)
+                time.sleep(NARRATION_PAUSE_SECONDS)
             event_log.append(
                 "role_start",
                 role=new_role,
                 role_label=_ROLE_LABEL.get(new_role, new_role),
             )
-            time.sleep(0.3)
+            time.sleep(ROLE_START_PAUSE_SECONDS)
 
     registry = _InstrumentedToolRegistry(backend, event_log, on_role_change)
     settings = get_settings()
@@ -576,6 +586,10 @@ def _run(
     )
     run_repo.create(run)
     run_repo.create_report(harness_report)
+    run_repo.store_report_document(
+        harness_report.harness_run_id,
+        build_compiled_report_document(harness_report),
+    )
 
     # ---- Phase 4: final report ---------------------------------------------------
     recommendation = harness_report.recommendations[0] if harness_report.recommendations else None
@@ -592,7 +606,7 @@ def _run(
                 "with the full decision trail."
             ),
         )
-        time.sleep(1.6)
+        time.sleep(NARRATION_PAUSE_SECONDS)
     event_log.append(
         "report_ready",
         harness_run_id=harness_report.harness_run_id,
@@ -633,7 +647,7 @@ def _wrap_role_run(
             claim=fact.claim,
             evidence_id=fact.evidence_id,
         )
-        time.sleep(0.18)
+        time.sleep(FACT_PAUSE_SECONDS)
     for inference in response.inferences:
         event_log.append(
             "inference",
@@ -642,7 +656,7 @@ def _wrap_role_run(
             claim=inference.claim,
             confidence=inference.confidence,
         )
-        time.sleep(0.18)
+        time.sleep(FACT_PAUSE_SECONDS)
     for recommendation in response.recommendations:
         event_log.append(
             "recommendation",
@@ -652,7 +666,7 @@ def _wrap_role_run(
             action_label=_action_label(recommendation.action),
             requires_approval=recommendation.requires_approval,
         )
-        time.sleep(0.2)
+        time.sleep(FACT_PAUSE_SECONDS)
     return response
 
 

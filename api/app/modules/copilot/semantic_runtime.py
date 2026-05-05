@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
@@ -95,6 +96,7 @@ ROLE_TOOL_GUIDANCE: dict[str, str] = {
 @dataclass
 class SemanticKernelRoleRunner:
     settings: Settings
+    timeout_seconds: float = 10.0
     _runner: asyncio.Runner | None = None
 
     def run(self, role_name: str, context: AgentExecutionContext, registry: ToolRegistry) -> AgentResponse:
@@ -140,13 +142,16 @@ class SemanticKernelRoleRunner:
             ),
         )
 
-        result = await kernel.invoke(
-            function=prompt_function,
-            arguments=KernelArguments(
-                query=context.query,
-                incident_id=context.incident_id,
-                lga_id=context.lga_id,
+        result = await asyncio.wait_for(
+            kernel.invoke(
+                function=prompt_function,
+                arguments=KernelArguments(
+                    query=context.query,
+                    incident_id=context.incident_id,
+                    lga_id=context.lga_id,
+                ),
             ),
+            timeout=self.timeout_seconds,
         )
         response_text = str(result).strip() if result is not None else ""
         payload = StructuredRoleResponse.model_validate(self._extract_json_payload(response_text))
@@ -252,6 +257,7 @@ Return this exact shape:
 @dataclass
 class SemanticKernelReportFollowUpRunner:
     settings: Settings
+    timeout_seconds: float = 12.0
     _runner: asyncio.Runner | None = None
 
     def run(
@@ -290,16 +296,19 @@ class SemanticKernelReportFollowUpRunner:
                 max_completion_tokens=700,
             ),
         )
-        result = await kernel.invoke(
-            function=prompt_function,
-            arguments=KernelArguments(
-                report_json=report.model_dump_json(),
-                history_json=json.dumps(
-                    [exchange.model_dump(mode="json") for exchange in history],
-                    default=str,
+        result = await asyncio.wait_for(
+            kernel.invoke(
+                function=prompt_function,
+                arguments=KernelArguments(
+                    report_json=report.model_dump_json(),
+                    history_json=json.dumps(
+                        [exchange.model_dump(mode="json") for exchange in history],
+                        default=str,
+                    ),
+                    message=message,
                 ),
-                message=message,
             ),
+            timeout=self.timeout_seconds,
         )
         payload = StructuredReportFollowUpResponse.model_validate(
             SemanticKernelRoleRunner._extract_json_payload(str(result).strip())
@@ -354,6 +363,7 @@ Return JSON only:
 @dataclass
 class SemanticKernelReportDocumentRunner:
     settings: Settings
+    timeout_seconds: float = 15.0
     _runner: asyncio.Runner | None = None
 
     def run(self, *, report: HarnessRunReport) -> StructuredReportDocumentResponse:
@@ -375,16 +385,30 @@ class SemanticKernelReportDocumentRunner:
             prompt_execution_settings=AzureChatPromptExecutionSettings(
                 service_id=SERVICE_ID,
                 temperature=0.2,
-                max_completion_tokens=2600,
+                max_completion_tokens=4200,
             ),
         )
-        result = await kernel.invoke(
-            function=prompt_function,
-            arguments=KernelArguments(report_json=report.model_dump_json()),
+        result = await asyncio.wait_for(
+            kernel.invoke(
+                function=prompt_function,
+                arguments=KernelArguments(report_json=report.model_dump_json()),
+            ),
+            timeout=self.timeout_seconds,
         )
-        return StructuredReportDocumentResponse.model_validate(
-            SemanticKernelRoleRunner._extract_json_payload(str(result).strip())
-        )
+        return self._parse_response(str(result).strip())
+
+    @staticmethod
+    def _parse_response(response_text: str) -> StructuredReportDocumentResponse:
+        try:
+            return StructuredReportDocumentResponse.model_validate(
+                SemanticKernelRoleRunner._extract_json_payload(response_text)
+            )
+        except ValueError:
+            title = _extract_json_like_string(response_text, "title")
+            body = _extract_json_like_string(response_text, "body_markdown")
+            if title is None or body is None:
+                raise
+            return StructuredReportDocumentResponse(title=title, body_markdown=body)
 
     @staticmethod
     def _prompt() -> str:
@@ -583,3 +607,38 @@ class RoleScopedToolPlugin:
         elif isinstance(value, list):
             for item in value:
                 yield from cls._walk(item)
+
+
+def _extract_json_like_string(response_text: str, key: str) -> str | None:
+    if key == "body_markdown":
+        match = re.search(
+            rf'"{re.escape(key)}"\s*:\s*"(.*)"\s*}}\s*$',
+            response_text,
+            flags=re.DOTALL,
+        )
+        if match is None:
+            match = re.search(
+                rf'"{re.escape(key)}"\s*:\s*"(.*)\s*$',
+                response_text,
+                flags=re.DOTALL,
+            )
+        if match is None:
+            return None
+        return _decode_json_like_string(match.group(1))
+
+    match = re.search(
+        rf'"{re.escape(key)}"\s*:\s*"(.*?)"\s*,',
+        response_text,
+        flags=re.DOTALL,
+    )
+    if match is None:
+        return None
+    return _decode_json_like_string(match.group(1))
+
+
+def _decode_json_like_string(value: str) -> str:
+    normalized = value.replace("\r\n", "\n").replace("\r", "\n")
+    try:
+        return json.loads('"' + normalized.replace("\n", "\\n") + '"')
+    except json.JSONDecodeError:
+        return normalized.replace('\\"', '"').replace("\\n", "\n")

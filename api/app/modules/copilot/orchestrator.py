@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Protocol
@@ -17,6 +18,9 @@ from app.modules.copilot.role_plugins import (
 from app.modules.copilot.schemas import CopilotQueryRequest
 from app.modules.copilot.tool_registry import ToolRegistry
 from app.modules.copilot.validation import ClaimValidator
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class RoleRunner(Protocol):
@@ -136,7 +140,14 @@ class MainInvestigationAgent:
 
     def _run_role(self, role_name: str, context: AgentExecutionContext) -> AgentResponse:
         if self._role_runner is not None:
-            return self._role_runner.run(role_name, context, self._registry)
+            try:
+                return self._role_runner.run(role_name, context, self._registry)
+            except Exception:
+                _LOGGER.warning(
+                    "Live role runner failed for %s; falling back to deterministic role plugin.",
+                    role_name,
+                    exc_info=True,
+                )
         plugin = ROLE_PLUGIN_TYPES[role_name]()
         return plugin.run(context, self._registry)
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.core.schemas import InvestigationRun
 from app.modules.copilot.harness import HarnessRunReport
+from app.modules.copilot.report_documents import CompiledReportDocument
 from app.modules.copilot.schemas import FollowUpExchange
 
 
@@ -9,6 +10,7 @@ class InvestigationRunRepository:
     def __init__(self) -> None:
         self._runs: dict[str, InvestigationRun] = {}
         self._reports: dict[str, HarnessRunReport] = {}
+        self._documents: dict[str, CompiledReportDocument] = {}
         self._follow_ups: dict[str, list[FollowUpExchange]] = {}
 
     def create(self, run: InvestigationRun) -> InvestigationRun:
@@ -31,6 +33,17 @@ class InvestigationRunRepository:
 
     def get_report(self, harness_run_id: str) -> HarnessRunReport | None:
         return self._reports.get(harness_run_id)
+
+    def store_report_document(
+        self,
+        harness_run_id: str,
+        document: CompiledReportDocument,
+    ) -> CompiledReportDocument:
+        self._documents[harness_run_id] = document
+        return document
+
+    def get_report_document(self, harness_run_id: str) -> CompiledReportDocument | None:
+        return self._documents.get(harness_run_id)
 
     def list_reports_for_incident(self, incident_id: str) -> list[HarnessRunReport]:
         return [

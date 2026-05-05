@@ -24,6 +24,7 @@ class DemoDatasetTestCase(unittest.TestCase):
                 "recharge",
                 "complaints",
                 "device_sessions",
+                "social_media",
             },
         )
 
