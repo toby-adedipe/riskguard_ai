@@ -19,8 +19,14 @@ from app.modules.copilot.db import InvestigationRunRepository
 from app.modules.copilot.harness import HarnessRunReport
 from app.modules.copilot.orchestrator import MainInvestigationAgent
 from app.modules.copilot.semantic_runtime import (
+    SemanticKernelReportDocumentRunner,
     SemanticKernelReportFollowUpRunner,
     SemanticKernelRoleRunner,
+)
+from app.modules.copilot.report_documents import (
+    DOCX_MEDIA_TYPE,
+    CompiledReportDocument,
+    build_report_docx,
 )
 from app.modules.copilot.schemas import (
     CopilotFollowUpRequest,
@@ -195,6 +201,11 @@ class CopilotService:
             if settings.azure_openai_configured
             else None
         )
+        self._document_runner = (
+            SemanticKernelReportDocumentRunner(settings=settings)
+            if settings.azure_openai_configured
+            else None
+        )
         self._run_repo = run_repo
         self._incident_repo = incident_repo
         self._backend = backend
@@ -293,6 +304,27 @@ class CopilotService:
             role_runner.close()
         if self._follow_up_runner is not None:
             self._follow_up_runner.close()
+        if self._document_runner is not None:
+            self._document_runner.close()
+
+    def compile_report_document(self, harness_run_id: str) -> CompiledReportDocument | None:
+        report = self._run_repo.get_report(harness_run_id)
+        if report is None:
+            return None
+
+        if self._document_runner is not None:
+            draft = self._document_runner.run(report=report)
+            title = draft.title
+            body = draft.body_markdown
+        else:
+            title, body = self._offline_report_document(report)
+
+        filename = f"riskguard-investigation-{harness_run_id}.docx"
+        return CompiledReportDocument(
+            filename=filename,
+            media_type=DOCX_MEDIA_TYPE,
+            content=build_report_docx(title=title, body_markdown=body),
+        )
 
     @staticmethod
     def _deterministic_follow_up_answer(
@@ -338,3 +370,61 @@ class CopilotService:
             f"{report.summary}",
             evidence_ids,
         )
+
+    @staticmethod
+    def _offline_report_document(report: HarnessRunReport) -> tuple[str, str]:
+        evidence_lines = "\n".join(
+            f"- {item.evidence_id}: {item.summary} Source: {item.source_system or 'investigation'}."
+            for item in report.evidence
+        )
+        step_lines = "\n".join(
+            f"- {step.title}: {step.status}. {step.summary}"
+            for step in report.steps
+        )
+        recommendation_lines = "\n".join(
+            f"- {item.action}; approval required: {item.requires_approval}."
+            for item in report.recommendations
+        ) or "- No supported mitigation recommendation was produced."
+        simulation = report.mitigation_simulation
+        simulation_text = (
+            f"The do-nothing curve is {simulation.do_nothing_curve}. "
+            f"The recommended action is {simulation.recommended_action_id}. "
+            f"{simulation.summary}"
+            if simulation is not None
+            else "No mitigation simulation was persisted with this run."
+        )
+        title = f"RiskGuard AI Investigation Report - {report.incident_id or report.lga_id}"
+        body = f"""
+# Executive Summary
+RiskGuard AI completed an investigation for {report.incident_id or report.lga_id}. {report.summary} The report status is {report.status}, and the decision trail is grounded in {len(report.evidence)} evidence references collected during the run. The investigation used the playbook {report.playbook_id}, selected these roles: {', '.join(report.selected_roles)}, and captured these next actions: {', '.join(report.next_actions)}.
+
+This document is the offline rendering of the same report contract used by the live LLM document compiler. It preserves the professional structure, evidence citations, and operational decision trail so the NOC can review the incident without re-running the agents.
+
+---PAGE BREAK---
+
+# Incident Context
+The triggering condition was: {report.trigger_reason}. The investigation started at {report.started_at.isoformat()} and completed at {report.completed_at.isoformat()}. The selected specialist agents performed role-specific tool checks before the final report was compiled.
+
+# Evidence Review
+{evidence_lines}
+
+# Customer and Social Media Impact
+Customer-impact evidence includes complaints, device-session data, and social-media listening when present in the report. Social evidence is treated as corroborating customer pressure, not as a replacement for network telemetry. The social-media signals help the operator understand public escalation risk and affected-customer perception.
+
+# Revenue and Regulatory Exposure
+Revenue and compliance exposure were assessed from persisted impact estimates, audit trail checks, and NCC pack readiness where those tools were available. Compliance outputs remain subject to operator review before external submission.
+
+# Mitigation Assessment
+{simulation_text}
+
+# Recommended Decision
+{recommendation_lines}
+
+---PAGE BREAK---
+
+# Open Risks and Next Actions
+{step_lines}
+
+The operator should validate the recommended mitigation action, confirm customer communications, and preserve the evidence references listed above for audit and post-incident review.
+""".strip()
+        return title, body

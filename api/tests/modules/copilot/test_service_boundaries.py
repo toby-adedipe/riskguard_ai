@@ -63,6 +63,34 @@ class CopilotServiceBoundaryTestCase(unittest.TestCase):
         finally:
             service.close()
 
+    def test_investigation_report_includes_social_media_evidence(self) -> None:
+        service = self._build_offline_service()
+        try:
+            report = service.investigate(self._trigger())
+
+            self.assertIn("social_media", {evidence.domain for evidence in report.evidence})
+            self.assertTrue(
+                any("social" in evidence.source_system for evidence in report.evidence if evidence.source_system)
+            )
+        finally:
+            service.close()
+
+    def test_compile_report_document_returns_downloadable_docx(self) -> None:
+        service = self._build_offline_service()
+        try:
+            report = service.investigate(self._trigger())
+
+            document = service.compile_report_document(report.harness_run_id)
+
+            self.assertIsNotNone(document)
+            assert document is not None
+            self.assertEqual(document.media_type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            self.assertTrue(document.filename.endswith(".docx"))
+            self.assertGreater(len(document.content), 1000)
+            self.assertTrue(document.content.startswith(b"PK"))
+        finally:
+            service.close()
+
     def test_maybe_investigate_from_signal_respects_wake_threshold(self) -> None:
         service = self._build_offline_service()
         scenario = load_demo_scenario()

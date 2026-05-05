@@ -109,6 +109,55 @@ class WakeConditionEvaluatorTestCase(unittest.TestCase):
 
         self.assertIsNone(trigger)
 
+    def test_custom_score_threshold_blocks_otherwise_high_risk_case(self) -> None:
+        evaluator = WakeConditionEvaluator(minimum_score=90.0)
+        score = RiskScore(
+            lga_id="ikeja",
+            score=87.0,
+            severity="red",
+            confidence=0.91,
+            time_to_breach_minutes=47,
+            updated_at=datetime.now(timezone.utc),
+        )
+        windows = [
+            FeatureWindow(
+                lga_id="ikeja",
+                domain="network",
+                kpi="cell_availability_pct",
+                window_minutes=15,
+                current_value=61.0,
+                rolling_mean=97.0,
+                rolling_stddev=4.0,
+                z_score=-9.0,
+                delta_pct=-37.0,
+                anomaly_score=0.94,
+                sample_count=15,
+                time_to_breach_minutes=47,
+                evidence_ids=["evd:1"],
+                updated_at=datetime.now(timezone.utc),
+            ),
+            FeatureWindow(
+                lga_id="ikeja",
+                domain="billing",
+                kpi="failed_rating_events",
+                window_minutes=15,
+                current_value=180.0,
+                rolling_mean=30.0,
+                rolling_stddev=10.0,
+                z_score=15.0,
+                delta_pct=500.0,
+                anomaly_score=0.82,
+                sample_count=15,
+                time_to_breach_minutes=47,
+                evidence_ids=["evd:2"],
+                updated_at=datetime.now(timezone.utc),
+            ),
+        ]
+
+        trigger = evaluator.evaluate(score, windows, incident=None)
+
+        self.assertIsNone(trigger)
+
 
 if __name__ == "__main__":
     unittest.main()

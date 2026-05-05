@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { api, CopilotResponse } from "../../lib/api";
+import { CopilotResponse, fetchCopilot } from "../../lib/api";
 import { Bot, Search, Info, Lightbulb, CheckCircle2, ChevronDown, Send } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import React from "react";
@@ -10,21 +10,21 @@ interface CopilotPanelProps {
 }
 
 const ROLES = [
-  { id: "network", label: "Network Operations" },
-  { id: "revenue", label: "Revenue Assurance" },
-  { id: "cx", label: "Customer Experience" },
-  { id: "compliance", label: "Legal & Compliance" },
+  { id: "network_risk", label: "Network Operations" },
+  { id: "revenue_assurance", label: "Revenue Assurance" },
+  { id: "customer_experience", label: "Customer Experience" },
   { id: "mitigation", label: "Tactical Mitigation" },
+  { id: "compliance", label: "Legal & Compliance" },
 ];
 
 export function CopilotPanel({ incidentId }: CopilotPanelProps) {
-  const [role, setRole] = useState("network");
+  const [role, setRole] = useState("network_risk");
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<CopilotResponse | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (payload: { role: string; query: string; incident_id: string }) => 
-      api.post("/copilot/query", payload).then(res => res.data),
+    mutationFn: (payload: { role: string; query: string; incident_id: string }) =>
+      fetchCopilot(payload),
     onSuccess: (data) => {
       setResponse(data);
     }
@@ -69,6 +69,10 @@ export function CopilotPanel({ incidentId }: CopilotPanelProps) {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-3"
             >
+              <div className="p-3 bg-white border border-slate-200 rounded">
+                <p className="text-xs leading-relaxed text-slate-800">{response.answer}</p>
+              </div>
+
               {/* Facts (Blue Soft) */}
               <div className="p-3 bg-blue-soft border border-blue-100 rounded">
                 <div className="flex items-center gap-2 mb-1 text-blue-800">
@@ -92,6 +96,25 @@ export function CopilotPanel({ incidentId }: CopilotPanelProps) {
                 </div>
                 <p className="text-xs leading-relaxed text-slate-700 font-medium">{response.recommendations}</p>
               </div>
+
+              {response.sources.length > 0 && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded">
+                  <div className="flex items-center gap-2 mb-1 text-slate-600">
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Sources</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {response.sources.map((source) => (
+                      <span
+                        key={source.evidenceId}
+                        title={source.label}
+                        className="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[10px] font-mono text-slate-600"
+                      >
+                        {source.evidenceId}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,7 +1,11 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+API_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -15,7 +19,7 @@ class Settings(BaseSettings):
     azure_openai_deployment: str | None = None
     azure_openai_api_version: str = "2024-10-21"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=API_ROOT / ".env", extra="ignore")
 
     @property
     def cors_origins_list(self) -> list[str]:

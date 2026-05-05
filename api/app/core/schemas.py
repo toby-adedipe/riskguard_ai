@@ -30,6 +30,7 @@ SignalDomain = Literal[
     "recharge",
     "complaints",
     "device_sessions",
+    "social_media",
 ]
 
 NetworkKpi = Literal[
@@ -58,6 +59,10 @@ DeviceSessionKpi = Literal[
     "session_failure_rate_pct",
     "attach_failure_rate_pct",
 ]
+SocialMediaKpi = Literal[
+    "social_posts_per_hr",
+    "negative_sentiment_score",
+]
 SignalKpi = Literal[
     "cell_availability_pct",
     "dropped_call_rate_pct",
@@ -76,6 +81,8 @@ SignalKpi = Literal[
     "complaint_rate_per_1k_subscribers",
     "session_failure_rate_pct",
     "attach_failure_rate_pct",
+    "social_posts_per_hr",
+    "negative_sentiment_score",
 ]
 
 
@@ -226,6 +233,11 @@ class AgentRecommendation(BaseModel):
     requires_approval: bool = True
 
 
+class AgentCitation(BaseModel):
+    evidence_id: str
+    label: str
+
+
 class InvestigationTrigger(BaseModel):
     trigger_id: str
     lga_id: str
@@ -256,9 +268,11 @@ class InvestigationRun(BaseModel):
 class AgentResponse(BaseModel):
     agent_role: str
     incident_id: str
+    answer: str | None = None
     facts: list[AgentFact] = Field(default_factory=list)
     inferences: list[AgentInference] = Field(default_factory=list)
     recommendations: list[AgentRecommendation] = Field(default_factory=list)
+    citations: list[AgentCitation] = Field(default_factory=list)
     tools_called: list[str] = Field(default_factory=list)
     validation_status: Literal["passed", "revised", "rejected"] = "passed"
     known_evidence_ids: list[str] = Field(default_factory=list, exclude=True)

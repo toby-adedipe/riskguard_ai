@@ -26,6 +26,11 @@ class BaseRolePlugin:
     def run(self, context: AgentExecutionContext, registry: ToolRegistry) -> AgentResponse:
         raise NotImplementedError
 
+    @staticmethod
+    def _source_suffix(facts: list[AgentFact]) -> str:
+        source_ids = [fact.evidence_id for fact in facts]
+        return " Sources: " + ", ".join(f"[{source_id}]" for source_id in source_ids) if source_ids else ""
+
 
 class NetworkRiskSubAgent(BaseRolePlugin):
     role_name = "network_risk"
@@ -67,9 +72,14 @@ class NetworkRiskSubAgent(BaseRolePlugin):
                     confidence=0.8,
                 )
             )
+        answer_parts = [fact.claim for fact in facts[:2]]
+        if incident is not None:
+            answer_parts.append(f"The incident record points to {incident.cause} as the active cause.")
+        answer = " ".join(answer_parts).strip() + self._source_suffix(facts)
         return AgentResponse(
             agent_role=self.role_name,
             incident_id=context.incident_id,
+            answer=answer,
             facts=facts,
             inferences=inferences,
             recommendations=[],
@@ -120,9 +130,14 @@ class RevenueRiskSubAgent(BaseRolePlugin):
                     confidence=0.86,
                 )
             )
+        answer_parts = [fact.claim for fact in facts[:2]]
+        if isinstance(revenue_at_risk, (int, float)):
+            answer_parts.append(f"The current estimated revenue at risk is NGN {revenue_at_risk:,.0f}.")
+        answer = " ".join(answer_parts).strip() + self._source_suffix(facts)
         return AgentResponse(
             agent_role=self.role_name,
             incident_id=context.incident_id,
+            answer=answer,
             facts=facts,
             inferences=inferences,
             recommendations=[],
@@ -144,8 +159,8 @@ class CustomerImpactSubAgent(BaseRolePlugin):
             self.role_name,
             "get_signal_evidence",
             context.lga_id,
-            ["complaints", "device_sessions"],
-            3,
+            ["complaints", "device_sessions", "social_media"],
+            4,
         )
         evidence_ids = {item.evidence_id for item in evidence}
         facts = [
@@ -161,9 +176,14 @@ class CustomerImpactSubAgent(BaseRolePlugin):
                     confidence=0.9,
                 )
             )
+        answer_parts = [fact.claim for fact in facts[:2]]
+        if isinstance(affected_subscribers, int):
+            answer_parts.append(f"The incident impact model currently puts affected subscribers at {affected_subscribers:,}.")
+        answer = " ".join(answer_parts).strip() + self._source_suffix(facts)
         return AgentResponse(
             agent_role=self.role_name,
             incident_id=context.incident_id,
+            answer=answer,
             facts=facts,
             inferences=inferences,
             recommendations=[],
@@ -230,9 +250,13 @@ class MitigationSubAgent(BaseRolePlugin):
                     confidence=0.84,
                 )
             )
+        answer = (
+            inferences[0].claim if inferences else "No mitigation option is justified by the current playbook and simulation."
+        ) + self._source_suffix(facts)
         return AgentResponse(
             agent_role=self.role_name,
             incident_id=context.incident_id,
+            answer=answer,
             facts=facts,
             inferences=inferences,
             recommendations=recommendations,
@@ -305,9 +329,14 @@ class ComplianceSubAgent(BaseRolePlugin):
                     confidence=0.82,
                 )
             )
+        answer_parts = [fact.claim for fact in facts[:1]]
+        if ncc_exposure_summary:
+            answer_parts.append(ncc_exposure_summary)
+        answer = " ".join(answer_parts).strip() + self._source_suffix(facts)
         return AgentResponse(
             agent_role=self.role_name,
             incident_id=context.incident_id,
+            answer=answer,
             facts=facts,
             inferences=inferences,
             recommendations=[],
@@ -338,6 +367,6 @@ def domains_to_roles(domains: list[SignalDomain]) -> list[str]:
         roles.append("network_risk")
     if domain_set & {"billing", "sales", "recharge"}:
         roles.append("revenue_assurance")
-    if domain_set & {"complaints", "device_sessions"}:
+    if domain_set & {"complaints", "device_sessions", "social_media"}:
         roles.append("customer_experience")
     return roles

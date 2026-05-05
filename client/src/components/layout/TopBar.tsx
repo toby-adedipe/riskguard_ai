@@ -1,12 +1,20 @@
-import { Activity, Play, Zap, ShieldCheck, RefreshCw } from "lucide-react";
+import { Activity } from "lucide-react";
 import { api } from "../../lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface TopBarProps {
+  agentThreshold: number;
+  onAgentThresholdChange: (threshold: number) => void;
   onIncidentDetection: (id: string | null) => void;
 }
 
-export function TopBar({ onIncidentDetection }: TopBarProps) {
+const AGENT_THRESHOLDS = [65, 75, 85, 90];
+
+export function TopBar({
+  agentThreshold,
+  onAgentThresholdChange,
+  onIncidentDetection,
+}: TopBarProps) {
   const queryClient = useQueryClient();
 
   const startMutation = useMutation({
@@ -14,14 +22,6 @@ export function TopBar({ onIncidentDetection }: TopBarProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["riskMap"] });
       onIncidentDetection(null);
-    },
-  });
-
-  const triggerMutation = useMutation({
-    mutationFn: () => api.post("/simulation/trigger/ikeja"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["riskMap"] });
-      onIncidentDetection("INC-IK-001");
     },
   });
 
@@ -58,21 +58,30 @@ export function TopBar({ onIncidentDetection }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <button 
+        <label className="flex items-center gap-2 px-2.5 py-1.5 border border-slate-200 rounded bg-slate-50">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            Agent trigger
+          </span>
+          <select
+            value={agentThreshold}
+            onChange={(event) => onAgentThresholdChange(Number(event.target.value))}
+            className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded px-2 py-0.5 outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {AGENT_THRESHOLDS.map((threshold) => (
+              <option key={threshold} value={threshold}>
+                {threshold}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
           onClick={() => startMutation.mutate()}
           disabled={startMutation.isPending}
           className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
           Start Simulation
         </button>
-        <button 
-          onClick={() => triggerMutation.mutate()}
-          disabled={triggerMutation.isPending}
-          className="px-3 py-1.5 text-xs font-semibold border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 transition-colors"
-        >
-          Trigger Ikeja Incident
-        </button>
-        <button 
+        <button
           onClick={() => mitigateMutation.mutate()}
           disabled={mitigateMutation.isPending}
           className="px-3 py-1.5 text-xs font-semibold border border-green-200 text-green-600 rounded hover:bg-green-50 disabled:opacity-50 transition-colors"

@@ -8,6 +8,12 @@ class RiskScoreRepository:
     def upsert(self, score: RiskScore) -> None:
         self._scores[score.lga_id] = score
 
+    def clear(self) -> None:
+        self._scores = {}
+
+    def exists(self, lga_id: str) -> bool:
+        return lga_id in self._scores
+
     def list_all(self) -> list[RiskScore]:
         return list(self._scores.values())
 

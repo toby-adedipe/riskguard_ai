@@ -7,6 +7,10 @@ from app.modules.compliance.routes import router as compliance_router
 from app.modules.copilot.routes import router as copilot_router
 from app.modules.incidents.routes import router as incidents_router
 from app.modules.risk.routes import router as risk_router
+from app.modules.risk.db import get_risk_repo
+from app.modules.incidents.db import get_incident_repo
+from app.modules.simulation.db import get_simulation_repo
+from app.modules.simulation.services import SimulationService
 from app.modules.simulation.routes import router as simulation_router
 
 
@@ -32,5 +36,13 @@ def create_app() -> FastAPI:
     app.include_router(copilot_router)
     app.include_router(actions_router)
     app.include_router(compliance_router)
+
+    @app.on_event("startup")
+    async def seed_state() -> None:
+        SimulationService(
+            repo=get_simulation_repo(),
+            risk_repo=get_risk_repo(),
+            incident_repo=get_incident_repo(),
+        ).start()
 
     return app

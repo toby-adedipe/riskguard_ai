@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, LGA } from "../../lib/api";
+import { LGA, fetchRiskMap } from "../../lib/api";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
 export function RecoveryView() {
   const { data: lgas } = useQuery<LGA[]>({
     queryKey: ["riskMap"],
-    queryFn: () => api.get("/risk/map").then((res) => res.data),
+    queryFn: () => fetchRiskMap(),
     refetchInterval: 5000,
   });
 
   const ikeja = lgas?.find(l => l.id === "ikeja");
-  
+
   // Mock history for chart (last 5 intervals)
   // In a real app we'd fetch actual timeseries
   const data = [
@@ -47,31 +47,31 @@ export function RecoveryView() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-            <XAxis 
-              dataKey="time" 
+            <XAxis
+              dataKey="time"
               hide
             />
-            <YAxis 
-              domain={[0, 100]} 
+            <YAxis
+              domain={[0, 100]}
               hide
             />
-            <Tooltip 
+            <Tooltip
               contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '10px' }}
               labelStyle={{ fontWeight: 'bold' }}
             />
-            <Area 
-              type="monotone" 
-              dataKey="risk" 
-              stroke="#2563EB" 
+            <Area
+              type="monotone"
+              dataKey="risk"
+              stroke="#2563EB"
               strokeWidth={2}
-              fillOpacity={1} 
-              fill="url(#colorRisk)" 
+              fillOpacity={1}
+              fill="url(#colorRisk)"
             />
             <ReferenceLine y={87} stroke="#DC2626" strokeDasharray="3 3" label={{ value: 'INCIDENT', position: 'insideTopLeft', fill: '#DC2626', fontSize: 8 }} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      
+
       <div className="mt-3 flex items-center justify-between">
         <div>
           <p className="text-[10px] text-slate-400 uppercase">Current MTTR</p>

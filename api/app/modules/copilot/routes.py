@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import cast
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 
 from app.core.schemas import InvestigationTrigger, Operator, OperatorRole
 from app.modules.audit.db import AuditLogRepository, get_audit_repo
@@ -120,6 +120,25 @@ def list_incident_investigations(
 ) -> list[HarnessRunReport]:
     require_operator_access(operator, "reports")
     return service.list_reports_for_incident(incident_id)
+
+
+@router.get("/investigations/{harness_run_id}/document")
+def download_investigation_document(
+    harness_run_id: str,
+    service: CopilotService = Depends(get_service),
+    operator: Operator = Depends(get_current_operator),
+) -> Response:
+    require_operator_access(operator, "reports")
+    document = service.compile_report_document(harness_run_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Investigation report not found.")
+    return Response(
+        content=document.content,
+        media_type=document.media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{document.filename}"',
+        },
+    )
 
 
 @router.post(

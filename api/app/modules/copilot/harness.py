@@ -205,7 +205,7 @@ class InvestigationHarness:
         )
         tools_called.append("get_risk_snapshot")
 
-        domains = trigger.triggered_domains or self._all_domains_for_incident()
+        domains = list(dict.fromkeys([*(trigger.triggered_domains or []), *self._all_domains_for_incident()]))
         feature_windows = self._registry.call(
             "investigation_harness",
             "get_feature_windows",
@@ -343,6 +343,7 @@ class InvestigationHarness:
             "recharge",
             "complaints",
             "device_sessions",
+            "social_media",
         ]
 
     @staticmethod
@@ -393,7 +394,7 @@ class InvestigationHarness:
         if not evidence_ids:
             return []
 
-        domains = trigger.triggered_domains or self._all_domains_for_incident()
+        domains = list(dict.fromkeys([*(trigger.triggered_domains or []), *self._all_domains_for_incident()]))
         signal_evidence = self._registry.call(
             "investigation_harness",
             "get_signal_evidence",
@@ -565,7 +566,7 @@ def _role_step(role: str) -> HarnessPlaybookStep:
     descriptions_by_role = {
         "network_risk": "Check network and BTS evidence, feature-window trends, and root-cause clues.",
         "revenue_assurance": "Check billing, sales, and recharge exposure tied to the incident.",
-        "customer_experience": "Check complaints, device-session failures, and subscriber impact.",
+        "customer_experience": "Check complaints, social-media sentiment, device-session failures, and subscriber impact.",
         "mitigation": "Fetch the mitigation playbook, run pre-action simulations, and recommend the best supported action.",
         "compliance": "Check NCC exposure, auditability, pack readiness, and claim validation.",
     }

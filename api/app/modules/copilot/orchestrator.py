@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Protocol
 
-from app.core.schemas import AgentResponse, InvestigationRun, InvestigationTrigger
+from app.core.schemas import AgentCitation, AgentResponse, InvestigationRun, InvestigationTrigger
 from app.modules.copilot.db import InvestigationRunRepository
 from app.modules.copilot.harness import HarnessRunReport, InvestigationHarness
 from app.modules.copilot.role_plugins import (
@@ -52,7 +52,7 @@ class MainInvestigationAgent:
             query=request.query,
         )
         raw_response = self._run_role(request.role, context)
-        return self._validate_response(raw_response)
+        return self._finalize_response(self._validate_response(raw_response))
 
     def investigate_trigger(self, trigger: InvestigationTrigger) -> InvestigationRun:
         run, _ = self._run_and_persist(trigger)
@@ -120,6 +120,19 @@ class MainInvestigationAgent:
             known_evidence_ids=evidence_ids,
             allowed_actions=allowed_actions,
         )
+
+    @staticmethod
+    def _finalize_response(response: AgentResponse) -> AgentResponse:
+        citations = [
+            AgentCitation(evidence_id=fact.evidence_id, label=fact.claim)
+            for fact in response.facts
+        ]
+        answer = response.answer
+        if answer is None:
+            parts = [fact.claim for fact in response.facts[:2]]
+            parts.extend(inference.claim for inference in response.inferences[:1])
+            answer = " ".join(parts).strip() or "I could not find grounded evidence for that question."
+        return response.model_copy(update={"answer": answer, "citations": citations})
 
     def _run_role(self, role_name: str, context: AgentExecutionContext) -> AgentResponse:
         if self._role_runner is not None:

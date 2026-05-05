@@ -17,6 +17,12 @@ class IncidentRepository:
             return
         self._incidents[incident_id] = existing.model_copy(update={"phase": phase})
 
+    def list_all(self) -> list[Incident]:
+        return list(self._incidents.values())
+
+    def clear(self) -> None:
+        self._incidents = {}
+
 
 _repo = IncidentRepository()
 

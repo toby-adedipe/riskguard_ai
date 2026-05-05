@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, MitigationAction } from "../../lib/api";
+import { MitigationAction, approveAction, fetchMitigationActions } from "../../lib/api";
 import { ShieldCheck, ArrowRight, TrendingDown, Target, Zap } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -12,15 +12,16 @@ export function MitigationPanel({ incidentId }: MitigationPanelProps) {
 
   const { data: actions, isLoading } = useQuery<MitigationAction[]>({
     queryKey: ["mitigationActions", incidentId],
-    queryFn: () => api.post("/actions/simulate", { incident_id: incidentId }).then(res => res.data),
+    queryFn: () => fetchMitigationActions(incidentId || ""),
     enabled: !!incidentId,
   });
 
   const approveMutation = useMutation({
-    mutationFn: (actionId: string) => api.post("/actions/approve", { action_id: actionId }),
+    mutationFn: (actionId: string) => approveAction({ incidentId, actionId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["riskMap"] });
       queryClient.invalidateQueries({ queryKey: ["incident"] });
+      queryClient.invalidateQueries({ queryKey: ["simulationStatus"] });
     },
   });
 
@@ -59,8 +60,8 @@ export function MitigationPanel({ incidentId }: MitigationPanelProps) {
                   <div className="text-[9px] text-slate-500">{action.timeToEffect} effect lag</div>
                 </td>
                 <td className="p-3 text-right">
-                  <span className={`font-bold ${action.riskReduction > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {action.riskReduction > 0 ? `-${action.riskReduction}%` : `+14%`}
+                  <span className={`font-bold ${action.riskReduction > 0 ? "text-green-600" : "text-slate-400"}`}>
+                    {action.riskReduction > 0 ? `-${action.riskReduction}%` : "N/A"}
                   </span>
                 </td>
                 <td className="p-3 text-right text-slate-500 font-mono">

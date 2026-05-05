@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, Incident } from "../../lib/api";
+import { Incident, fetchIncident } from "../../lib/api";
 import { AlertCircle, Users, Briefcase, DollarSign, ShieldAlert, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
 import React from "react";
@@ -12,7 +12,7 @@ interface IncidentPanelProps {
 export function IncidentPanel({ incidentId, children }: IncidentPanelProps) {
   const { data: incident, isLoading } = useQuery<Incident>({
     queryKey: ["incident", incidentId],
-    queryFn: () => api.get(`/incidents/${incidentId}`).then((res) => res.data),
+    queryFn: () => fetchIncident(incidentId),
     enabled: !!incidentId,
     refetchInterval: 5000,
   });

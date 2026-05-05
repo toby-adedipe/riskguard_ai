@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -81,7 +82,76 @@ class DemoScenario(BaseModel):
 def load_demo_scenario() -> DemoScenario:
     with FIXTURE_PATH.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
-    return DemoScenario.model_validate(payload)
+    return _with_social_media_signals(DemoScenario.model_validate(payload))
+
+
+def _with_social_media_signals(scenario: DemoScenario) -> DemoScenario:
+    evidence_id = "evd:ikeja:social_media:negative_sentiment"
+    if any(evidence.evidence_id == evidence_id for evidence in scenario.signal_evidence):
+        return scenario
+
+    now = datetime(2026, 5, 5, 14, 16, tzinfo=timezone.utc)
+    event = SignalEvent(
+        event_id="evt-ikeja-social-media-001",
+        lga_id="ikeja",
+        domain="social_media",
+        kpi="social_posts_per_hr",
+        value=186.0,
+        unit="posts/hr",
+        source_system="social_media_listening",
+        baseline_value=14.0,
+        delta_pct=1228.57,
+        threshold_value=40.0,
+        anomaly_score=0.89,
+        severity_hint="high",
+        sample_window_minutes=15,
+        correlation_key="ikeja-network-outage-social",
+        evidence_id=evidence_id,
+        timestamp=now,
+    )
+    window = FeatureWindow(
+        lga_id="ikeja",
+        domain="social_media",
+        kpi="social_posts_per_hr",
+        window_minutes=15,
+        current_value=186.0,
+        rolling_mean=14.0,
+        rolling_stddev=35.1,
+        z_score=4.9,
+        delta_pct=1228.57,
+        anomaly_score=0.89,
+        sample_count=15,
+        time_to_breach_minutes=47,
+        evidence_ids=[evidence_id],
+        updated_at=now,
+    )
+    evidence = SignalEvidence(
+        evidence_id=evidence_id,
+        lga_id="ikeja",
+        incident_id="INC-2025-IKEJA-001",
+        domain="social_media",
+        kpi="social_posts_per_hr",
+        current_value=186.0,
+        baseline_value=14.0,
+        delta_pct=1228.57,
+        anomaly_score=0.89,
+        severity_hint="high",
+        summary=(
+            "Social listening detected 186 Ikeja outage posts per hour versus a "
+            "14-post baseline, with negative sentiment concentrated around failed "
+            "data sessions and enterprise connectivity."
+        ),
+        source_system="social_media_listening",
+        timestamp=now,
+        related_event_ids=[event.event_id],
+    )
+    return scenario.model_copy(
+        update={
+            "signal_events": scenario.signal_events + [event],
+            "feature_windows": scenario.feature_windows + [window],
+            "signal_evidence": scenario.signal_evidence + [evidence],
+        }
+    )
 
 
 def seed_demo_state(

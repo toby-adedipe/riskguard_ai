@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, CompliancePack } from "../../lib/api";
+import { CompliancePack, fetchCompliancePack } from "../../lib/api";
 import { FileText, Download, ShieldCheck, History, ListFilter, Activity, Users, Info, LucideIcon } from "lucide-react";
 import React from "react";
 
@@ -10,7 +10,7 @@ interface CompliancePackViewProps {
 export function CompliancePackView({ incidentId }: CompliancePackViewProps) {
   const { data: pack, isLoading } = useQuery<CompliancePack>({
     queryKey: ["compliancePack", incidentId],
-    queryFn: () => api.get(`/compliance/pack/${incidentId}`).then(res => res.data),
+    queryFn: () => fetchCompliancePack(incidentId),
     enabled: !!incidentId,
   });
 

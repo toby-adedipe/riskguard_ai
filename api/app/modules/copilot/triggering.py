@@ -36,7 +36,7 @@ class WakeConditionEvaluator:
             }
         )
 
-        is_score_high = (
+        is_score_eligible = (
             score.score >= self._minimum_score
             and score.confidence >= self._minimum_confidence
         )
@@ -46,14 +46,13 @@ class WakeConditionEvaluator:
         )
         is_multi_domain = len(triggered_domains) >= self._minimum_triggered_domains
 
-        if not (is_score_high or is_breach_close or is_multi_domain):
+        if not is_score_eligible:
             return None
 
         reasons = []
-        if is_score_high:
-            reasons.append(
-                f"score {score.score:.1f} with confidence {score.confidence:.2f}"
-            )
+        reasons.append(
+            f"score {score.score:.1f} with confidence {score.confidence:.2f}"
+        )
         if is_breach_close and score.time_to_breach_minutes is not None:
             reasons.append(
                 f"time to breach {score.time_to_breach_minutes} minutes"

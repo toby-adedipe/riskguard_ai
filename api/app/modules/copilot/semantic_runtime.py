@@ -26,6 +26,7 @@ from app.modules.copilot.tool_contracts import ROLE_ALLOWED_TOOLS
 
 
 class StructuredRoleResponse(BaseModel):
+    answer: str | None = None
     facts: list[AgentFact] = Field(default_factory=list)
     inferences: list[AgentInference] = Field(default_factory=list)
     recommendations: list[AgentRecommendation] = Field(default_factory=list)
@@ -35,6 +36,11 @@ class StructuredReportFollowUpResponse(BaseModel):
     answer: str
     evidence_ids: list[str] = Field(default_factory=list)
     recommendation_actions: list[str] = Field(default_factory=list)
+
+
+class StructuredReportDocumentResponse(BaseModel):
+    title: str
+    body_markdown: str
 
 
 ROLE_DIRECTIVES: dict[str, str] = {
@@ -47,8 +53,8 @@ ROLE_DIRECTIVES: dict[str, str] = {
         "revenue leakage or commercial exposure during the active incident."
     ),
     "customer_experience": (
-        "Investigate customer-facing impact using complaints and device-session evidence. "
-        "Explain subscriber impact in grounded terms."
+        "Investigate customer-facing impact using complaints, social-media listening, "
+        "and device-session evidence. Explain subscriber impact in grounded terms."
     ),
     "mitigation": (
         "Compare mitigation options against the do-nothing path. Recommend one action "
@@ -72,7 +78,8 @@ ROLE_TOOL_GUIDANCE: dict[str, str] = {
         "for `billing`, `sales`, and `recharge`."
     ),
     "customer_experience": (
-        "Call `estimate_impact` and `get_signal_evidence` for `complaints` and `device_sessions`."
+        "Call `estimate_impact` and `get_signal_evidence` for `complaints`, "
+        "`social_media`, and `device_sessions`."
     ),
     "mitigation": (
         "Call `get_incident_context`, `get_mitigation_playbook`, `run_pre_action_simulation`, "
@@ -147,6 +154,7 @@ class SemanticKernelRoleRunner:
         return AgentResponse(
             agent_role=role_name,
             incident_id=context.incident_id,
+            answer=payload.answer,
             facts=payload.facts,
             inferences=payload.inferences,
             recommendations=payload.recommendations,
@@ -167,6 +175,7 @@ Mission:
 Operating rules:
 - You must call one or more `backend_tools` functions before answering.
 - Use only information returned by tools in this run.
+- Answer the operator's question directly in `answer`, using bracketed evidence ids such as `[evd:...]`.
 - Facts must include an `evidence_id` taken verbatim from tool outputs.
 - Inferences may summarize evidence, but do not invent KPI values, money, subscriber counts, site ids, or actions.
 - Recommendations must use action ids returned by tool outputs. If no action is justified, return an empty list.
@@ -181,6 +190,7 @@ Operator question: {{{{$query}}}}
 
 Return this exact shape:
 {{
+  "answer": "2-4 sentence answer with bracketed evidence ids",
   "facts": [
     {{"claim": "string", "evidence_id": "string"}}
   ],
@@ -337,6 +347,74 @@ Return JSON only:
   "answer": "string",
   "evidence_ids": ["evidence_id from report"],
   "recommendation_actions": ["action id from report"]
+}
+""".strip()
+
+
+@dataclass
+class SemanticKernelReportDocumentRunner:
+    settings: Settings
+    _runner: asyncio.Runner | None = None
+
+    def run(self, *, report: HarnessRunReport) -> StructuredReportDocumentResponse:
+        if self._runner is None:
+            self._runner = asyncio.Runner()
+        return self._runner.run(self._arun(report=report))
+
+    def close(self) -> None:
+        if self._runner is not None:
+            self._runner.close()
+            self._runner = None
+
+    async def _arun(self, *, report: HarnessRunReport) -> StructuredReportDocumentResponse:
+        kernel = build_semantic_kernel(self.settings)
+        prompt_function = kernel.add_function(
+            plugin_name="copilot_report_document",
+            function_name="compile_professional_report",
+            prompt=self._prompt(),
+            prompt_execution_settings=AzureChatPromptExecutionSettings(
+                service_id=SERVICE_ID,
+                temperature=0.2,
+                max_completion_tokens=2600,
+            ),
+        )
+        result = await kernel.invoke(
+            function=prompt_function,
+            arguments=KernelArguments(report_json=report.model_dump_json()),
+        )
+        return StructuredReportDocumentResponse.model_validate(
+            SemanticKernelRoleRunner._extract_json_payload(str(result).strip())
+        )
+
+    @staticmethod
+    def _prompt() -> str:
+        return """
+You are RiskGuard AI's senior telecom incident report writer.
+
+Use only the persisted investigation report JSON. Do not invent KPIs, money,
+subscriber counts, sites, evidence ids, source systems, or actions. Compile a
+professional operator-facing incident report suitable for an executive and NOC
+handover pack.
+
+Requirements:
+- The report must be comprehensive and read like a 2-3 page professional report.
+- Target 1,400 to 1,900 words.
+- Include social-media listening evidence when present.
+- Cite evidence ids inline in square brackets.
+- Include these sections: Executive Summary, Incident Context, Evidence Review,
+  Customer and Social Media Impact, Revenue and Regulatory Exposure, Mitigation
+  Assessment, Recommended Decision, Open Risks and Next Actions.
+- Insert the literal line ---PAGE BREAK--- after the Executive Summary and
+  again before Open Risks and Next Actions.
+- Return JSON only, no markdown fences.
+
+Persisted investigation report JSON:
+{{{{$report_json}}}}
+
+Return:
+{
+  "title": "string",
+  "body_markdown": "markdown report body"
 }
 """.strip()
 
