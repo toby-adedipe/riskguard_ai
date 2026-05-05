@@ -27,6 +27,34 @@ from app.modules.copilot.harness import HarnessRunReport
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 PDF_MEDIA_TYPE = "application/pdf"
 
+ROLE_LABELS = {
+    "network_risk": "Network risk specialist",
+    "revenue_assurance": "Revenue assurance specialist",
+    "customer_experience": "Customer experience specialist",
+    "mitigation": "Mitigation planner",
+    "compliance": "Compliance officer",
+}
+
+ACTION_LABELS = {
+    "reroute_traffic": "Reroute traffic",
+    "dispatch_field_team": "Dispatch a field team",
+}
+
+PLAYBOOK_LABELS = {
+    "mvp-wake-on-signal-investigation": "wake-on-signal investigation playbook",
+}
+
+DOMAIN_LABELS = {
+    "network": "network quality",
+    "bts": "site availability",
+    "billing": "billing",
+    "sales": "sales",
+    "recharge": "recharge",
+    "complaints": "customer complaints",
+    "device_sessions": "device sessions",
+    "social_media": "social media",
+}
+
 
 @dataclass(frozen=True)
 class CompiledReportDocument:
@@ -45,48 +73,53 @@ def build_compiled_report_document(report: HarnessRunReport) -> CompiledReportDo
 
 
 def report_markdown(report: HarnessRunReport) -> tuple[str, str]:
+    incident_label = report.incident_id or report.lga_id
     evidence_lines = "\n".join(
-        f"- **{item.evidence_id}:** {item.summary} Source: {item.source_system or 'investigation'}."
+        f"- **{_evidence_heading(item)}:** {_clean_text(item.summary)} Source: {_source_label(item.source_system)}."
         for item in report.evidence
     ) or "- No evidence references were persisted with this run."
     step_lines = "\n".join(
-        f"- **{step.title}:** {step.status}. {step.summary}"
+        f"- **{_step_title(step.title, step.role)}:** {_status_label(step.status)}. {_clean_text(step.summary)}"
         for step in report.steps
     )
     recommendation_lines = "\n".join(
-        f"- **{item.action}:** approval required: {item.requires_approval}."
+        f"- **{_action_label(item.action)}:** {_recommendation_explanation(item.action, item.requires_approval)}"
         for item in report.recommendations
-    ) or "- No supported mitigation recommendation was produced."
+    ) or "- No supported mitigation recommendation was produced. The operator should keep monitoring until a supported action is available."
     simulation = report.mitigation_simulation
     if simulation is not None:
         recommended = next((item for item in simulation.actions if item.recommended), None)
-        recommended_curve = recommended.projected_score_curve if recommended is not None else []
+        recommended_curve = _curve_text(recommended.projected_score_curve) if recommended is not None else "not available"
         simulation_text = (
-            f"The do-nothing score curve is {simulation.do_nothing_curve}. "
-            f"The recommended action is {simulation.recommended_action_id}. "
-            f"The recommended action curve is {recommended_curve}. {simulation.summary}"
+            f"If no action is taken, the risk path is projected as {_curve_text(simulation.do_nothing_curve)}. "
+            f"The supported action is **{_action_label(simulation.recommended_action_id)}**, with a projected path of {recommended_curve}. "
+            "In simple terms, the recommended action bends the risk curve downward instead of letting it climb."
         )
     else:
         simulation_text = "No mitigation simulation was persisted with this run."
 
-    title = f"RiskGuard AI Investigation Report - {report.incident_id or report.lga_id}"
+    title = f"RiskGuard AI Investigation Report - {incident_label}"
     body = f"""
 # Executive Summary
-RiskGuard AI completed an investigation for {report.incident_id or report.lga_id}. {report.summary}
+{_executive_summary(report)}
 
-The report status is **{report.status}**. The decision trail is grounded in **{len(report.evidence)} evidence references** collected during the run. The investigation used playbook **{report.playbook_id}** and selected these specialist roles: **{', '.join(report.selected_roles)}**.
+The investigation **{_status_label(report.status).lower()}** and reviewed **{len(report.evidence)} evidence references**. The review followed the **{_playbook_label(report.playbook_id)}** and used these specialists: **{_role_list(report.selected_roles)}**.
 
-Next actions captured by the investigation are:
-{_markdown_list(report.next_actions)}
+What this means: the recommendation is not based on one noisy alert. It is based on several independent signals pointing in the same direction, which makes the decision easier to trust.
+
+Operator next steps:
+{_markdown_list(_human_next_actions(report))}
 
 ---PAGE BREAK---
 
 # Incident Context
-The triggering condition was: {report.trigger_reason}
+{_incident_context(report)}
 
-The investigation started at {report.started_at.isoformat()} and completed at {report.completed_at.isoformat()}. The selected specialists performed role-specific checks before the final operator report was compiled.
+The investigation started at {report.started_at.isoformat()} and completed at {report.completed_at.isoformat()}. Each specialist checked a different part of the problem so the final recommendation could separate symptoms from likely operational impact.
 
 # Evidence Review
+The evidence below is written as: what changed, why it matters, and where the signal came from.
+
 {evidence_lines}
 
 # Customer and Social Media Impact
@@ -106,7 +139,7 @@ Revenue and compliance exposure were assessed from persisted impact estimates, a
 # Open Risks and Next Actions
 {step_lines}
 
-The operator should validate the recommended mitigation action, confirm customer communications, and preserve the evidence references listed above for audit and post-incident review.
+The operator should validate the recommended mitigation, confirm customer communications, and preserve the evidence references listed above for audit and post-incident review.
 """.strip()
     return title, body
 
@@ -149,7 +182,7 @@ def build_report_pdf(*, title: str, body_markdown: str) -> bytes:
 
 def _markdown_to_pdf_story(title: str, markdown: str, styles: dict[str, ParagraphStyle]) -> list:
     story: list = [
-        Paragraph("RISKGUARD AI / OPERATIONAL COMMAND", styles["kicker"]),
+        Paragraph("RISKGUARD AI", styles["kicker"]),
         Spacer(1, 0.12 * inch),
         Paragraph(_pdf_escape(title), styles["title"]),
         Spacer(1, 0.08 * inch),
@@ -376,9 +409,153 @@ def _markdown_list(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items)
 
 
+def _executive_summary(report: HarnessRunReport) -> str:
+    incident_label = report.incident_id or report.lga_id
+    roles = _role_list(report.selected_roles)
+    action = _action_label(report.recommendations[0].action if report.recommendations else None)
+    domains = _evidence_domain_list(report)
+    return (
+        f"RiskGuard AI investigated {incident_label} because the risk score crossed the selected trigger level "
+        f"and several warning signs appeared at the same time: {domains}. "
+        f"In plain language, this was not one isolated alarm; it looked like a real service problem because multiple systems agreed. "
+        f"The investigation asked {roles} to check the facts, and the supported recommendation is **{action}**."
+    )
+
+
+def _incident_context(report: HarnessRunReport) -> str:
+    trigger = _clean_text(report.trigger_reason).rstrip(".")
+    return (
+        f"The trigger was: {trigger}. "
+        "Think of the trigger like a smoke alarm: one signal can be noise, but several signals rising together mean the team should investigate quickly. "
+        "Here, the risk score, customer-impact signals, and operational evidence were strong enough to wake the specialist workflow."
+    )
+
+
+def _human_next_actions(report: HarnessRunReport) -> list[str]:
+    if report.recommendations:
+        action = _action_label(report.recommendations[0].action)
+        return [
+            f"Review and approve the recommended action: {action}.",
+            "Tell the incident room what customer impact is expected if action is delayed.",
+            "Keep the NCC evidence pack ready in case the incident crosses a regulatory reporting threshold.",
+        ]
+    return [
+        "Review the collected evidence and continue monitoring.",
+        "Ask for a mitigation simulation before approving an action.",
+        "Keep customer-communication owners informed while the incident remains active.",
+    ]
+
+
+def _evidence_domain_list(report: HarnessRunReport) -> str:
+    domains = []
+    for evidence in report.evidence:
+        if evidence.domain is None:
+            continue
+        label = DOMAIN_LABELS.get(evidence.domain, _humanize_identifier(evidence.domain))
+        if label not in domains:
+            domains.append(label)
+    if not domains:
+        return "operational telemetry and customer-impact evidence"
+    if len(domains) == 1:
+        return domains[0]
+    return ", ".join(domains[:-1]) + f", and {domains[-1]}"
+
+
+def _evidence_heading(item) -> str:
+    domain = DOMAIN_LABELS.get(item.domain or "", _humanize_identifier(item.domain or "investigation evidence"))
+    if item.kpi:
+        return f"{domain.title()} - {_humanize_identifier(item.kpi)}"
+    return domain.title()
+
+
+def _step_title(title: str, role: str | None) -> str:
+    if role is not None and role in ROLE_LABELS:
+        return ROLE_LABELS[role].title()
+    return _clean_text(title)
+
+
+def _status_label(status: str) -> str:
+    return {
+        "passed": "Completed successfully",
+        "failed": "Needs review",
+        "skipped": "Skipped",
+        "ok": "Completed successfully",
+    }.get(status, _humanize_identifier(status))
+
+
+def _recommendation_explanation(action: str, requires_approval: bool) -> str:
+    approval = "Human approval is required before execution." if requires_approval else "No extra approval is required."
+    if action == "reroute_traffic":
+        return (
+            "Move traffic away from the stressed parts of the network so fewer customers stay on failing paths. "
+            f"{approval}"
+        )
+    if action == "dispatch_field_team":
+        return (
+            "Send field engineers to inspect the affected sites and confirm whether physical repair is needed. "
+            f"{approval}"
+        )
+    return f"Review this mitigation option with the incident lead. {approval}"
+
+
+def _curve_text(values: list[float]) -> str:
+    if not values:
+        return "not available"
+    rounded = [str(round(value, 1)).rstrip("0").rstrip(".") for value in values]
+    return " -> ".join(rounded)
+
+
+def _role_list(roles: list[str]) -> str:
+    labels = [ROLE_LABELS.get(role, _humanize_identifier(role)) for role in roles]
+    if not labels:
+        return "the investigation team"
+    if len(labels) == 1:
+        return labels[0]
+    return ", ".join(labels[:-1]) + f", and {labels[-1]}"
+
+
+def _playbook_label(playbook_id: str) -> str:
+    return PLAYBOOK_LABELS.get(playbook_id, _humanize_identifier(playbook_id))
+
+
+def _action_label(action: str | None) -> str:
+    if action is None:
+        return "continue monitoring"
+    return ACTION_LABELS.get(action, _humanize_identifier(action))
+
+
+def _source_label(source: str | None) -> str:
+    if not source:
+        return "investigation record"
+    return _humanize_identifier(source)
+
+
+def _clean_text(text: str) -> str:
+    cleaned = text.replace("`", "")
+    replacements = {
+        "network_risk": ROLE_LABELS["network_risk"],
+        "revenue_assurance": ROLE_LABELS["revenue_assurance"],
+        "customer_experience": ROLE_LABELS["customer_experience"],
+        "reroute_traffic": ACTION_LABELS["reroute_traffic"],
+        "dispatch_field_team": ACTION_LABELS["dispatch_field_team"],
+        "mvp-wake-on-signal-investigation": PLAYBOOK_LABELS["mvp-wake-on-signal-investigation"],
+        "bts": "site availability",
+        "social_media": "social media",
+    }
+    for raw, label in replacements.items():
+        cleaned = cleaned.replace(raw, label)
+    cleaned = re.sub(r"\b([a-z]+(?:_[a-z0-9]+)+)\b", lambda match: _humanize_identifier(match.group(1)), cleaned)
+    cleaned = re.sub(r"\.\.+", ".", cleaned)
+    return cleaned
+
+
+def _humanize_identifier(value: str) -> str:
+    return value.replace("_", " ").replace("-", " ").strip()
+
+
 def _markdown_to_docx_paragraphs(title: str, markdown: str) -> list[str]:
     paragraphs = [
-        _paragraph("RISKGUARD AI / OPERATIONAL COMMAND", style="CoverKicker"),
+        _paragraph("RISKGUARD AI", style="CoverKicker"),
         _paragraph(title, style="CoverTitle"),
         _paragraph("Network incident handover report for executive, NOC, compliance, and revenue assurance review.", style="CoverSubtitle"),
         _paragraph("Generated from validated investigation evidence and mitigation simulations.", style="CoverMeta"),

@@ -12,6 +12,7 @@ from app.modules.audit.db import AuditLogRepository
 from app.modules.compliance.db import CompliancePackRepository
 from app.modules.copilot.db import InvestigationRunRepository
 from app.modules.copilot.routes import require_operator_access
+from app.modules.copilot.report_documents import report_markdown
 from app.modules.copilot.schemas import CopilotFollowUpRequest
 from app.modules.copilot.services import CopilotService
 from app.modules.copilot.semantic_runtime import SemanticKernelReportDocumentRunner
@@ -89,6 +90,21 @@ class CopilotServiceBoundaryTestCase(unittest.TestCase):
             self.assertTrue(document.filename.endswith(".pdf"))
             self.assertGreater(len(document.content), 1000)
             self.assertTrue(document.content.startswith(b"%PDF"))
+        finally:
+            service.close()
+
+    def test_report_copy_hides_internal_identifiers(self) -> None:
+        service = self._build_offline_service()
+        try:
+            report = service.investigate(self._trigger())
+            _, body = report_markdown(report)
+
+            self.assertIn("Network risk specialist", body)
+            self.assertIn("Reroute traffic", body)
+            self.assertNotIn("network_risk", body)
+            self.assertNotIn("revenue_assurance", body)
+            self.assertNotIn("reroute_traffic", body)
+            self.assertNotIn("mvp-wake-on-signal-investigation", body)
         finally:
             service.close()
 

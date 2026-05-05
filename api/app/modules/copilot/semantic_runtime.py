@@ -413,7 +413,7 @@ class SemanticKernelReportDocumentRunner:
     @staticmethod
     def _prompt() -> str:
         return """
-You are RiskGuard AI's senior telecom incident report writer.
+You are RiskGuard AI's senior telecom incident analyst and report writer.
 
 Use only the persisted investigation report JSON. Do not invent KPIs, money,
 subscriber counts, sites, evidence ids, source systems, or actions. Compile a
@@ -423,6 +423,11 @@ handover pack.
 Requirements:
 - The report must be comprehensive and read like a 2-3 page professional report.
 - Target 1,400 to 1,900 words.
+- Write like an analyst explaining data clearly to a non-technical executive.
+- Use simple, concrete language: explain what changed, why it matters, and what
+  the operator should do next.
+- Do not expose internal ids such as role names, tool names, playbook ids, or
+  action ids unless they are evidence ids. Convert them to readable labels.
 - Include social-media listening evidence when present.
 - Cite evidence ids inline in square brackets.
 - Include these sections: Executive Summary, Incident Context, Evidence Review,
