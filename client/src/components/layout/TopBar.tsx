@@ -74,7 +74,7 @@ export function TopBar({
             ))}
           </select>
         </label>
-        <button
+        {/* <button
           onClick={() => startMutation.mutate()}
           disabled={startMutation.isPending}
           className="px-3 py-1.5 text-xs font-semibold bg-primary text-white rounded hover:bg-[#006CBE] disabled:opacity-50 transition-colors"
@@ -94,7 +94,7 @@ export function TopBar({
           className="px-3 py-1.5 text-xs font-semibold border border-border-base text-[#605E5C] rounded hover:bg-background disabled:opacity-50 transition-colors"
         >
           {resetMutation.isPending ? "Resetting..." : "Reset System"}
-        </button>
+        </button> */}
       </div>
     </header>
   );
