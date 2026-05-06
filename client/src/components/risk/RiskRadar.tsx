@@ -71,7 +71,7 @@ export function RiskRadar({ selectedLgaId, onSelectLGA }: RiskRadarProps) {
     riskById[l.id] = l.risk;
   });
 
-  const [view, setView] = useState<"list" | "map">("map");
+  const [view, setView] = useState<"list" | "map">("list");
   const [selectedState, setSelectedState] = useState<string | null>(null);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({

@@ -110,127 +110,194 @@ export function exportCompliancePdf(pack: CompliancePack, incidentId: string) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
   const today = new Date().toISOString().slice(0, 10);
+  const BLK: [number, number, number] = [0, 0, 0];
+  const GREY: [number, number, number] = [80, 80, 80];
+  const LGREY: [number, number, number] = [240, 240, 240];
+  const M = 14; // margin
 
-  addHeader(
-    doc,
-    "NCC Incident Compliance Report",
-    `REG-NCC-LGS-${incidentId} · ${today}`,
-  );
+  const fmtNGN = (n: number | undefined) =>
+    n != null ? `NGN ${Math.round(n).toLocaleString("en-NG")}` : "N/A";
+  const fmtNum = (n: number | undefined) =>
+    n != null ? n.toLocaleString() : "N/A";
+  const titleCase = (s: string) =>
+    s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-  let y = 38;
+  const plain = (
+    startY: number,
+    rows: [string, string][],
+  ) => {
+    autoTable(doc, {
+      startY,
+      body: rows,
+      margin: { left: M, right: M },
+      styles: { fontSize: 8, cellPadding: 1.8, textColor: BLK },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 72, textColor: GREY },
+      },
+      theme: "plain",
+      tableLineColor: [210, 210, 210],
+      tableLineWidth: 0.1,
+    });
+    return (doc as any).lastAutoTable.finalY + 3;
+  };
 
-  // ── 1. Incident Timeline ──────────────────────────────────────
-  y = sectionTitle(doc, "1. Incident Timeline", y);
-  y = bodyText(doc, pack.timeline, y);
-  y += 4;
+  const secHead = (title: string, y: number): number => {
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.4);
+    doc.line(M, y, w - M, y);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...BLK);
+    doc.text(title.toUpperCase(), M, y + 4.5);
+    return y + 7;
+  };
 
-  // ── 2 + 4 two-column row ─────────────────────────────────────
-  const colW = (w - 28 - 6) / 2;
-
-  // Section 2 – Affected Services
-  doc.setFillColor(...C.surface);
-  doc.rect(14, y, colW, 7, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(...C.navy);
-  doc.text("2. AFFECTED SERVICES", 17, y + 5);
-  let tagX = 14;
-  let tagY = y + 13;
-  for (const svc of pack.affectedServices) {
-    const textWidth = doc.getTextWidth(svc);
-    const pad = 3;
-    if (tagX + textWidth + pad * 2 + 3 > 14 + colW) {
-      tagX = 14;
-      tagY += 8;
+  const newPage = (y: number, minSpace = 40): number => {
+    if (y > doc.internal.pageSize.getHeight() - minSpace) {
+      doc.addPage();
+      return 12;
     }
-    tagX = tag(doc, svc, tagX, tagY);
-  }
-  const servicesBottom = tagY + 8;
+    return y;
+  };
 
-  // Section 4 – Impact Statistics
-  const col2X = 14 + colW + 6;
-  doc.setFillColor(...C.surface);
-  doc.rect(col2X, y, colW, 7, "F");
+  // ── Document title ────────────────────────────────────────────
+  let y = 12;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(...C.navy);
-  doc.text("4. IMPACT STATISTICS", col2X + 3, y + 5);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(...C.text);
-  doc.text(pack.impactedSubscribers.toLocaleString(), col2X + 3, y + 20);
-
+  doc.setFontSize(11);
+  doc.setTextColor(...BLK);
+  doc.text("NCC QUALITY OF SERVICE — INCIDENT COMPLIANCE REPORT", M, y);
+  y += 5;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...C.muted);
-  doc.text("MSISDN TOTAL", col2X + 3, y + 26);
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GREY);
+  doc.text(
+    `Ref: REG/NCC/LGS/${incidentId}   ·   Operator: MTN Nigeria Communications PLC   ·   Generated: ${today}`,
+    M,
+    y,
+  );
+  y += 6;
 
-  y = Math.max(servicesBottom, y + 32) + 4;
+  // ── 1. Incident Summary ───────────────────────────────────────
+  y = secHead("1. Incident Summary", y);
+  y = plain(y, [
+    ["Incident Reference", pack.incidentId ?? incidentId],
+    ["LGA / Zone", titleCase(pack.lgaId ?? "")],
+    ["Date & Time of Detection (WAT)", pack.openedAt ? new Date(pack.openedAt).toLocaleString("en-NG", { hour12: false }) : "N/A"],
+    ["Cause / Classification", titleCase(pack.cause ?? "")],
+    ["Phase at Report", titleCase(pack.phase ?? "")],
+    ["Risk Score at Peak", pack.riskScore != null ? `${pack.riskScore} / 100` : "N/A"],
+    ["Estimated Time-to-Breach", pack.timeToBreach != null ? `${pack.timeToBreach} minutes` : "N/A"],
+  ]);
 
-  // ── 3. Quality KPIs ──────────────────────────────────────────
-  y = sectionTitle(doc, "3. Quality KPIs", y);
-  // Red-tinted box
-  doc.setFillColor(253, 243, 243);
-  doc.rect(14, y, w - 28, 14, "F");
-  doc.setDrawColor(...C.red);
-  doc.setLineWidth(0.4);
-  doc.rect(14, y, w - 28, 14);
+  // ── 2. Impact Assessment ──────────────────────────────────────
+  y = secHead("2. Impact Assessment", y);
+  y = plain(y, [
+    ["Total Impacted Subscribers (MSISDN)", fmtNum(pack.impactedSubscribers)],
+    ["Enterprise Lines Affected", fmtNum(pack.enterpriseLines)],
+    ["Estimated Revenue at Risk", fmtNGN(pack.revenueAtRisk)],
+    ["Regulatory Compensation Exposure", fmtNGN(pack.compensationExposure)],
+    ["NCC Regulatory Exposure Summary", pack.nccExposureSummary ?? "N/A"],
+  ]);
+
+  // ── 3. Affected Services  +  4. Network KPIs ─────────────────
+  const colW = (w - M * 2 - 6) / 2;
+  const col2X = M + colW + 6;
+  const twoColY = y;
+
+  // draw each column header independently within its own x-range
+  const colSecHead = (title: string, x: number, cw: number, cy: number): number => {
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.4);
+    doc.line(x, cy, x + cw, cy);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...BLK);
+    doc.text(title.toUpperCase(), x, cy + 4.5);
+    return cy + 7;
+  };
+
+  const svcDataY = colSecHead("3. Affected Services", M, colW, twoColY);
+  autoTable(doc, {
+    startY: svcDataY,
+    body: pack.affectedServices.map((s) => [titleCase(s)]),
+    margin: { left: M, right: M + colW + 8 },
+    styles: { fontSize: 8, cellPadding: 1.8, textColor: BLK },
+    theme: "plain",
+    tableLineColor: [210, 210, 210],
+    tableLineWidth: 0.1,
+  });
+  const svcBottom = (doc as any).lastAutoTable.finalY + 3;
+
+  const kpiDataY = colSecHead("4. Network KPIs at Breach", col2X, colW, twoColY);
+  autoTable(doc, {
+    startY: kpiDataY,
+    body: Object.entries(pack.kpis).map(([k, v]) => [
+      titleCase(k),
+      typeof v === "number" ? v.toFixed(2) : String(v),
+    ]),
+    margin: { left: col2X, right: M },
+    styles: { fontSize: 8, cellPadding: 1.8, textColor: BLK },
+    columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
+    theme: "plain",
+    tableLineColor: [210, 210, 210],
+    tableLineWidth: 0.1,
+  });
+  const kpiBottom = (doc as any).lastAutoTable.finalY + 3;
+
+  y = Math.max(svcBottom, kpiBottom);
+
+  // ── 5. Incident Timeline ──────────────────────────────────────
+  y = secHead("5. Incident Timeline", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["#", "Event"]],
+    body: pack.timeline.map((e, i) => [i + 1, e]),
+    margin: { left: M, right: M },
+    styles: { fontSize: 8, cellPadding: 1.8, textColor: BLK },
+    headStyles: { fillColor: LGREY, textColor: BLK, fontStyle: "bold", fontSize: 7.5, lineColor: [180,180,180], lineWidth: 0.2 },
+    columnStyles: { 0: { cellWidth: 10, halign: "center" } },
+    theme: "grid",
+  });
+  y = (doc as any).lastAutoTable.finalY + 3;
+
+  // ── 6. Root Cause ─────────────────────────────────────────────
+  y = newPage(y, 50);
+  y = secHead("6. Root Cause Analysis (RCA)", y);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.setTextColor(...C.red);
-  const kpiLines = doc.splitTextToSize(pack.kpis, w - 32);
-  doc.text(kpiLines, 17, y + 5);
-  y += 18;
+  doc.setTextColor(...BLK);
+  const rcaLines = doc.splitTextToSize(pack.rootCause ?? "Not available.", w - M * 2);
+  doc.text(rcaLines, M, y);
+  y += rcaLines.length * 4.5 + 4;
 
-  // ── 5. Root Cause (RCA) ──────────────────────────────────────
-  y = sectionTitle(doc, "5. Root Cause (RCA)", y);
-  // Left border quote style
-  doc.setFillColor(...C.border);
-  doc.rect(14, y, 1.5, 20, "F");
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(9);
-  doc.setTextColor(...C.muted);
-  const rcaLines = doc.splitTextToSize(pack.rootCause, w - 34);
-  doc.text(rcaLines, 19, y + 5);
-  y += Math.max(24, rcaLines.length * 5 + 8);
-
-  // ── 6. Corrective Actions ────────────────────────────────────
-  y = sectionTitle(doc, "6. Corrective Actions", y);
-  const actions = pack.correctiveActions.split(" | ").filter(Boolean);
-
+  // ── 7. Corrective Actions ────────────────────────────────────
+  y = newPage(y, 40);
+  y = secHead("7. Corrective Actions Taken / Planned", y);
   autoTable(doc, {
     startY: y,
     head: [["#", "Action"]],
-    body: actions.map((a, i) => [i + 1, a]),
-    margin: { left: 14, right: 14 },
-    styles: { fontSize: 8, cellPadding: 3, textColor: C.text },
-    headStyles: { fillColor: C.navy, textColor: C.white, fontStyle: "bold", fontSize: 7 },
-    alternateRowStyles: { fillColor: C.surface },
+    body: pack.correctiveActions.map((a, i) => [i + 1, a]),
+    margin: { left: M, right: M },
+    styles: { fontSize: 8, cellPadding: 1.8, textColor: BLK },
+    headStyles: { fillColor: LGREY, textColor: BLK, fontStyle: "bold", fontSize: 7.5, lineColor: [180,180,180], lineWidth: 0.2 },
     columnStyles: { 0: { cellWidth: 10, halign: "center" } },
+    theme: "grid",
   });
-  y = (doc as any).lastAutoTable.finalY + 6;
+  y = (doc as any).lastAutoTable.finalY + 3;
 
-  // ── 7. Evidence Logs ─────────────────────────────────────────
-  if (y > doc.internal.pageSize.getHeight() - 40) {
-    doc.addPage();
-    addHeader(doc, "NCC Incident Compliance Report (cont.)", `REG-NCC-LGS-${incidentId} · ${today}`);
-    y = 38;
-  }
-
-  y = sectionTitle(doc, "7. Evidence Logs", y);
-  doc.setFillColor(...C.surface);
-  const logs = pack.evidenceLogs;
-  const logLines = doc.splitTextToSize(logs, w - 32);
-  const logHeight = logLines.length * 4.5 + 8;
-  doc.rect(14, y, w - 28, logHeight, "F");
-  doc.setFont("courier", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...C.muted);
-  doc.text(logLines, 17, y + 5);
-  y += logHeight + 4;
-
-  addFooter(doc, incidentId);
+  // ── 8. Evidence Reference Log ────────────────────────────────
+  y = newPage(y, 35);
+  y = secHead("8. Evidence Reference Log", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["#", "Evidence Entry"]],
+    body: pack.evidenceLogs.map((log, i) => [i + 1, log]),
+    margin: { left: M, right: M },
+    styles: { fontSize: 7, cellPadding: 1.5, textColor: GREY },
+    headStyles: { fillColor: LGREY, textColor: BLK, fontStyle: "bold", fontSize: 7.5, lineColor: [180,180,180], lineWidth: 0.2 },
+    columnStyles: { 0: { cellWidth: 10, halign: "center" } },
+    theme: "grid",
+  });
 
   doc.save(`riskguard-compliance-${incidentId}-${today}.pdf`);
 }
@@ -262,27 +329,27 @@ export function exportInvestigationPdf(report: {
 
   // ── Recommendation banner ─────────────────────────────────────
   doc.setFillColor(...C.green);
-  doc.rect(14, y, w - 28, 1.5, "F");
-  y += 5;
+  doc.rect(14, y, w - 28, 1, "F");
+  y += 3;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setTextColor(...C.green);
   doc.text("RECOMMENDATION READY", 14, y);
-  y += 6;
+  y += 4.5;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
+  doc.setFontSize(11);
   doc.setTextColor(...C.text);
   doc.text(recommendation, 14, y);
-  y += 8;
+  y += 5.5;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(...C.muted);
   const summaryLines = doc.splitTextToSize(report.summary ?? "", w - 28);
   doc.text(summaryLines, 14, y);
-  y += summaryLines.length * 5 + 8;
+  y += summaryLines.length * 4 + 5;
 
   // ── Decision metrics ──────────────────────────────────────────
   y = sectionTitle(doc, "Decision Trail", y);
@@ -297,13 +364,13 @@ export function exportInvestigationPdf(report: {
       ["Recommended action", recommendation],
     ],
     margin: { left: 14, right: 14 },
-    styles: { fontSize: 9, cellPadding: 3, textColor: C.text },
+    styles: { fontSize: 8, cellPadding: 2, textColor: C.text },
     columnStyles: {
       0: { fontStyle: "bold", cellWidth: 55, fillColor: C.surface, textColor: C.muted },
     },
     theme: "plain",
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (doc as any).lastAutoTable.finalY + 4;
 
   // ── Role roster ───────────────────────────────────────────────
   if (report.selected_roles.length > 0) {
@@ -313,7 +380,7 @@ export function exportInvestigationPdf(report: {
       head: [["#", "Agent Role", "Status"]],
       body: report.selected_roles.map((role, i) => [i + 1, role.replace(/_/g, " "), "Complete"]),
       margin: { left: 14, right: 14 },
-      styles: { fontSize: 8, cellPadding: 3, textColor: C.text },
+      styles: { fontSize: 8, cellPadding: 2, textColor: C.text },
       headStyles: { fillColor: C.navy, textColor: C.white, fontStyle: "bold", fontSize: 7 },
       alternateRowStyles: { fillColor: C.surface },
       columnStyles: {
@@ -340,7 +407,7 @@ export function exportInvestigationPdf(report: {
       head: [["Time", "Do Nothing (Risk Score)", "With Action (Risk Score)"]],
       body: rows,
       margin: { left: 14, right: 14 },
-      styles: { fontSize: 8, cellPadding: 3, textColor: C.text },
+      styles: { fontSize: 8, cellPadding: 2, textColor: C.text },
       headStyles: { fillColor: C.navy, textColor: C.white, fontStyle: "bold", fontSize: 7 },
       alternateRowStyles: { fillColor: C.surface },
       columnStyles: {

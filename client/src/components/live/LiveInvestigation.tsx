@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   buildAgentThread,
   humanizeRoleComplete,
@@ -12,8 +12,8 @@ import {
   useDerivedRoleProgress,
   useLiveStream,
 } from "../../lib/live";
-import { CopilotResponse, approveAction, fetchCopilot } from "../../lib/api";
-import { exportInvestigationPdf } from "../../lib/pdf";
+import { CopilotResponse, CompliancePack, approveAction, fetchCopilot, fetchCompliancePack } from "../../lib/api";
+import { exportCompliancePdf } from "../../lib/pdf";
 import {
   Activity,
   ArrowLeft,
@@ -69,6 +69,7 @@ interface LiveInvestigationProps {
   incidentId: string | null;
   onDismiss: () => void;
   onRedo: () => void;
+  onApproved?: (incident: { id: string; lgaId: string; cause: string; affectedSubs: number }) => void;
 }
 
 const PHASE_COPY: Record<LiveState["phase"], { label: string; sub: string }> = {
@@ -92,18 +93,98 @@ const PHASE_COPY: Record<LiveState["phase"], { label: string; sub: string }> = {
   },
 };
 
+const MITIGATION_KEY = (sid: string) => `rg_mitigated_${sid}`;
+
+interface PersistedMitigation {
+  score: number;
+  domainZScores: Record<string, number>;
+}
+
+function loadMitigation(sessionId: string | null): PersistedMitigation | null {
+  if (!sessionId) return null;
+  try { return JSON.parse(localStorage.getItem(MITIGATION_KEY(sessionId)) ?? "null"); }
+  catch { return null; }
+}
+
 export function LiveInvestigation({
   sessionId,
   incidentId,
   onDismiss,
   onRedo,
+  onApproved,
 }: LiveInvestigationProps) {
   const { state } = useLiveStream(sessionId);
   const progress = useDerivedRoleProgress(state);
 
+  // Restore mitigation state from localStorage on mount
+  const storedMitigation = useMemo(() => loadMitigation(sessionId), [sessionId]);
+
+  const [recovering, setRecovering] = useState(() => !!storedMitigation);
+  const recoveryRef = useRef<number | null>(null);
+  const [recoveryScore, setRecoveryScore] = useState(() => storedMitigation?.score ?? 0);
+  const [recoveryDomains, setRecoveryDomains] = useState<Record<string, number>>(
+    () => storedMitigation?.domainZScores ?? {}
+  );
+  const [wasApproved, setWasApproved] = useState(() => !!storedMitigation);
+
+  const startRecovery = (incident: { id: string; lgaId: string; cause: string; affectedSubs: number }) => {
+    onApproved?.(incident);
+    setRecovering(true);
+    setWasApproved(true);
+
+    const startScore = state.score;
+    const startDomains = { ...state.domainZScores };
+    const targetScore = 46;
+    // all domains in green zone (health ≥ 70% = z-score ≤ −4), with natural variation
+    const targetDomains: Record<string, number> = {
+      network: -7.0,
+      bts: -6.5,
+      recharge: -5.5,
+      complaints: -4.8,
+      billing: -4.3,
+      social_media: -4.1,
+    };
+
+    // Persist immediately so returning mid-animation still shows recovered state
+    if (sessionId) {
+      localStorage.setItem(MITIGATION_KEY(sessionId), JSON.stringify({ score: targetScore, domainZScores: targetDomains }));
+    }
+
+    const duration = 3200;
+    const startTime = performance.now();
+
+    const tick = (now: number) => {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setRecoveryScore(startScore + (targetScore - startScore) * eased);
+      setRecoveryDomains(
+        Object.fromEntries(
+          Object.entries(startDomains).map(([k, v]) => [k, v + ((targetDomains[k] ?? 0) - v) * eased])
+        )
+      );
+      if (t < 1) {
+        recoveryRef.current = requestAnimationFrame(tick);
+      } else {
+        setTimeout(onDismiss, 800);
+      }
+    };
+    recoveryRef.current = requestAnimationFrame(tick);
+  };
+
+  useEffect(() => () => { if (recoveryRef.current) cancelAnimationFrame(recoveryRef.current); }, []);
+
+  const displayState: LiveState = recovering
+    ? {
+        ...state,
+        score: recoveryScore,
+        severity: recoveryScore > 70 ? "red" : recoveryScore > 40 ? "amber" : "green",
+        domainZScores: recoveryDomains,
+      }
+    : state;
+
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-background">
-      <Header state={state} onDismiss={onDismiss} progress={progress} onRedo={onRedo} />
+      <Header state={displayState} onDismiss={onDismiss} progress={progress} onRedo={onRedo} />
 
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-4 px-6 py-4 overflow-hidden">
         <main className="col-span-12 lg:col-span-8 overflow-y-auto pr-1 space-y-4">
@@ -111,16 +192,17 @@ export function LiveInvestigation({
             <FinalReportBanner
               state={state}
               sessionId={sessionId}
-              onDismiss={onDismiss}
+              onApproved={startRecovery}
+              wasApproved={wasApproved}
             />
           )}
 
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-3 md:col-span-1">
-              <ScoreGauge state={state} />
+              <ScoreGauge state={displayState} />
             </div>
             <div className="col-span-3 md:col-span-2">
-              <DomainBreakdown state={state} />
+              <DomainBreakdown state={displayState} />
             </div>
           </div>
 
@@ -1106,11 +1188,13 @@ function CopilotBlock({
 function FinalReportBanner({
   state,
   sessionId,
-  onDismiss,
+  onApproved,
+  wasApproved,
 }: {
   state: LiveState;
   sessionId: string;
-  onDismiss: () => void;
+  onApproved: (incident: { id: string; lgaId: string; cause: string; affectedSubs: number }) => void;
+  wasApproved: boolean;
 }) {
   const queryClient = useQueryClient();
   const report = state.report!;
@@ -1127,26 +1211,27 @@ function FinalReportBanner({
       queryClient.invalidateQueries({ queryKey: ["riskMap"] });
       queryClient.invalidateQueries({ queryKey: ["incident"] });
       queryClient.invalidateQueries({ queryKey: ["compliancePack"] });
-      onDismiss();
+      onApproved({
+        id: report.incident_id,
+        lgaId: "ikeja",
+        cause: report.summary ?? "Network outage",
+        affectedSubs: compliancePack?.impactedSubscribers ?? 0,
+      });
     },
+  });
+
+  const { data: compliancePack } = useQuery<CompliancePack>({
+    queryKey: ["compliancePack", report.incident_id],
+    queryFn: () => fetchCompliancePack(report.incident_id),
   });
 
   const [pdfExporting, setPdfExporting] = useState(false);
 
   const handleDownloadPdf = () => {
+    if (!compliancePack) return;
     setPdfExporting(true);
     setTimeout(() => {
-      exportInvestigationPdf({
-        incident_id: report.incident_id,
-        harness_run_id: report.harness_run_id,
-        summary: report.summary ?? "",
-        recommended_action_label: report.recommended_action_label,
-        recommended_action: report.recommended_action,
-        selected_roles: report.selected_roles,
-        evidence_count: report.evidence_count,
-        do_nothing_curve: report.do_nothing_curve ?? [],
-        recovery_curve: report.recovery_curve ?? [],
-      });
+      exportCompliancePdf(compliancePack, report.incident_id);
       setPdfExporting(false);
     }, 50);
   };
@@ -1172,7 +1257,7 @@ function FinalReportBanner({
       <div className="flex items-start justify-between mb-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-success mb-1">
-            Recommendation ready
+            {wasApproved || approveMutation.isSuccess ? "Incident contained" : "Recommendation ready"}
           </p>
           <h2 className="text-xl font-semibold text-text-main leading-tight tracking-tight">
             {recommendation}
@@ -1206,19 +1291,26 @@ function FinalReportBanner({
           </p>
           <button
             onClick={handleDownloadPdf}
-            disabled={pdfExporting}
+            disabled={pdfExporting || !compliancePack}
             className="mt-auto mb-2 px-4 py-2 border border-[#B3D7F2] bg-white hover:bg-blue-soft disabled:opacity-50 text-primary font-semibold text-xs rounded-md transition-colors flex items-center justify-center gap-1.5"
           >
             <Download size={13} />
-            {pdfExporting ? "Generating PDF..." : "Download report"}
+            {pdfExporting ? "Generating PDF..." : !compliancePack ? "Loading…" : "Download report"}
           </button>
-          <button
-            onClick={() => approveMutation.mutate()}
-            disabled={approveMutation.isPending || !report.recommended_action}
-            className="px-4 py-2 bg-success hover:bg-[#0a5a0a] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-xs rounded-md transition-colors"
-          >
-            {approveMutation.isPending ? "Approving…" : "Approve & mitigate"}
-          </button>
+          {wasApproved || approveMutation.isSuccess ? (
+            <div className="px-4 py-2 bg-success-soft border border-[#A3D9A3] text-success font-semibold text-xs rounded-md flex items-center justify-center gap-1.5">
+              <CheckCircle2 size={13} />
+              Incident contained
+            </div>
+          ) : (
+            <button
+              onClick={() => approveMutation.mutate()}
+              disabled={approveMutation.isPending || !report.recommended_action}
+              className="px-4 py-2 bg-success hover:bg-[#0a5a0a] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-xs rounded-md transition-colors"
+            >
+              {approveMutation.isPending ? "Approving…" : "Approve & mitigate"}
+            </button>
+          )}
         </div>
       </div>
     </motion.div>

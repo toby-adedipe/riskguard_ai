@@ -132,13 +132,24 @@ export interface MitigationAction {
 }
 
 export interface CompliancePack {
-  timeline: string;
-  affectedServices: string[];
-  kpis: string;
+  incidentId: string;
+  lgaId: string;
+  cause: string;
+  phase: string;
+  openedAt: string;
+  riskScore: number | null;
+  timeToBreach: number | null;
   impactedSubscribers: number;
+  enterpriseLines: number;
+  revenueAtRisk: number;
+  compensationExposure: number;
+  nccExposureSummary: string;
+  affectedServices: string[];
+  kpis: Record<string, number>;
+  timeline: string[];
   rootCause: string;
-  correctiveActions: string;
-  evidenceLogs: string;
+  correctiveActions: string[];
+  evidenceLogs: string[];
 }
 
 import { LGA_NAMES } from "./lgas";
@@ -230,15 +241,24 @@ export const parseMitigationActions = (payload: ActionSimulationApi): Mitigation
 };
 
 export const parseCompliancePack = (payload: NCCPackTimelineApi): CompliancePack => ({
-  timeline: payload.timeline.join(" | "),
-  affectedServices: payload.affected_services,
-  kpis: Object.entries(payload.kpis)
-    .map(([key, value]) => `${key}: ${value}`)
-    .join(" | "),
+  incidentId: payload.incident.incident_id,
+  lgaId: payload.incident.lga_id,
+  cause: payload.incident.cause,
+  phase: payload.incident.phase,
+  openedAt: payload.incident.opened_at,
+  riskScore: payload.incident.risk_score,
+  timeToBreach: payload.incident.time_to_breach_minutes,
   impactedSubscribers: payload.impacted_subscribers,
+  enterpriseLines: payload.incident.impact.enterprise_lines,
+  revenueAtRisk: payload.incident.impact.revenue_at_risk_ngn,
+  compensationExposure: payload.incident.impact.compensation_exposure_ngn,
+  nccExposureSummary: payload.incident.impact.ncc_exposure_summary,
+  affectedServices: payload.affected_services,
+  kpis: payload.kpis,
+  timeline: payload.timeline,
   rootCause: payload.root_cause,
-  correctiveActions: payload.corrective_actions.join(" | "),
-  evidenceLogs: payload.evidence_logs.join(" | "),
+  correctiveActions: payload.corrective_actions,
+  evidenceLogs: payload.evidence_logs,
 });
 
 export async function fetchRiskMap(): Promise<LGA[]> {

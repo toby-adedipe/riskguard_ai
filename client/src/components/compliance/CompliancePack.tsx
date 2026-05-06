@@ -1,11 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { CompliancePack, fetchCompliancePack } from "../../lib/api";
 import { exportCompliancePdf } from "../../lib/pdf";
-import { FileText, Download, ShieldCheck, History, ListFilter, Activity, Users, Info, LucideIcon } from "lucide-react";
-import React, { useState } from "react";
+import { Download } from "lucide-react";
+import { useState } from "react";
+import { LGA_NAMES } from "../../lib/lgas";
 
 interface CompliancePackViewProps {
   incidentId: string | null;
+}
+
+const fmt = (n: number) => n.toLocaleString("en-NG");
+const fmtNGN = (n: number) =>
+  `₦${Math.round(n).toLocaleString("en-NG")}`;
+
+function kpiLabel(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function CompliancePackView({ incidentId }: CompliancePackViewProps) {
@@ -13,7 +24,7 @@ export function CompliancePackView({ incidentId }: CompliancePackViewProps) {
 
   const { data: pack, isLoading } = useQuery<CompliancePack>({
     queryKey: ["compliancePack", incidentId],
-    queryFn: () => fetchCompliancePack(incidentId),
+    queryFn: () => fetchCompliancePack(incidentId!),
     enabled: !!incidentId,
   });
 
@@ -28,102 +39,269 @@ export function CompliancePackView({ incidentId }: CompliancePackViewProps) {
 
   if (!incidentId) {
     return (
-      <div className="panel-card h-[600px] flex flex-col items-center justify-center p-12 text-center text-[#605E5C] bg-white">
-        <FileText size={64} className="mb-4 opacity-10" />
-        <h3 className="font-bold text-lg text-[#A19F9D]">NCC Compliance Pack</h3>
-        <p className="text-sm max-w-[280px]">Regulatory documentation is automatically generated upon incident detection for submission to NCC portals.</p>
+      <div className="h-full flex items-center justify-center text-sm text-[#605E5C]">
+        No incident selected. Trigger an investigation to generate documentation.
       </div>
     );
   }
 
-  if (isLoading) return <div className="panel-card h-[600px] bg-white animate-pulse" />;
+  if (isLoading) return <div className="h-full bg-white animate-pulse rounded" />;
   if (!pack) return null;
 
+  const lgaName =
+    (LGA_NAMES as Record<string, string>)[pack.lgaId] ?? pack.lgaId;
+  const openedDate = new Date(pack.openedAt);
+  const dateStr = openedDate.toLocaleDateString("en-NG", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+  const timeStr = openedDate.toLocaleTimeString("en-NG", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const kpiEntries = Object.entries(pack.kpis);
+
   return (
-    <div className="panel-card bg-white flex flex-col h-full overflow-hidden">
-      <div className="px-5 py-4 border-b border-[#EDEBE9] flex items-center justify-between bg-white flex-none">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#243A5E] text-white rounded-md">
-            <ShieldCheck size={18} />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-text-main">NCC Incident Compliance Report</h2>
-            <p className="text-[9px] font-mono text-[#605E5C] uppercase tracking-widest leading-none mt-1">Ref: REG-NCC-LGS-{incidentId}</p>
-          </div>
-        </div>
+    <div className="h-full flex flex-col bg-white overflow-hidden border border-border-base rounded-lg">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-5 py-2.5 border-b border-border-base flex-none bg-[#FAF9F8]">
+        <span className="text-[10px] font-mono text-[#605E5C] uppercase tracking-widest">
+          NCC QoS Compliance — REG/NCC/LGS/{pack.incidentId}
+        </span>
         <button
           onClick={handleExport}
           disabled={exporting}
-          className="flex items-center gap-2 px-3 py-1.5 bg-[#243A5E] text-white rounded-md text-[10px] font-bold hover:bg-[#1a2d4e] transition-all uppercase tracking-wider disabled:opacity-60"
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-[#605E5C] text-text-main rounded text-[10px] font-semibold hover:bg-[#EDEBE9] transition-colors disabled:opacity-50 uppercase tracking-wide"
         >
-          <Download size={12} />
-          {exporting ? "Generating..." : "Export PDF"}
+          <Download size={11} />
+          {exporting ? "Generating…" : "Export PDF"}
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white">
-        <Section title="1. Incident Timeline" icon={History}>
-          <div className="p-3 bg-[#FAF9F8] rounded-md border border-[#EDEBE9] font-mono text-[10px] text-[#605E5C] leading-relaxed">
-            {pack.timeline}
-          </div>
-        </Section>
-
-        <div className="grid grid-cols-2 gap-6">
-          <Section title="2. Affected Services" icon={ListFilter}>
-            <div className="flex flex-wrap gap-1.5">
-              {pack.affectedServices.map(s => (
-                <span key={s} className="px-2 py-0.5 bg-blue-soft text-primary rounded-sm text-[10px] font-bold border border-[#B3D7F2]">
-                  {s}
-                </span>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="4. Impact Statistics" icon={Users}>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono tracking-tighter text-text-main">{pack.impactedSubscribers.toLocaleString()}</span>
-              <span className="text-[10px] text-[#605E5C] font-medium font-mono">MSISDN TOTAL</span>
-            </div>
-          </Section>
+      {/* Document body */}
+      <div className="flex-1 overflow-y-auto px-8 py-6 text-[#1a1a1a]">
+        {/* Document title block */}
+        <div className="mb-5 pb-4 border-b-2 border-black">
+          <p className="text-[9px] font-mono uppercase tracking-[0.25em] text-[#605E5C] mb-1">
+            Nigerian Communications Commission — Quality of Service Incident Report
+          </p>
+          <h1 className="text-base font-bold tracking-tight leading-tight">
+            Network Outage Incident Report: {lgaName} Local Government Area
+          </h1>
+          <p className="text-[11px] text-text-main mt-0.5">
+            Operator: MTN Nigeria Communications PLC &nbsp;·&nbsp; Incident Ref:{" "}
+            <span className="font-mono font-semibold">{pack.incidentId}</span>{" "}
+            &nbsp;·&nbsp; Classification: Service Degradation / Outage
+          </p>
         </div>
 
-        <Section title="3. Quality KPIs" icon={Activity}>
-          <div className="p-3 bg-danger-soft text-danger rounded-md border border-[#F5C6C7] font-mono text-[10px] leading-relaxed">
-            {pack.kpis}
-          </div>
-        </Section>
+        {/* Section 1 — Incident Summary */}
+        <DocSection num="1" title="Incident Summary">
+          <table className="w-full text-xs border-collapse">
+            <tbody>
+              <Row label="Incident Reference" value={pack.incidentId} mono />
+              <Row label="LGA / Zone" value={`${lgaName} (${pack.lgaId.toUpperCase()})`} />
+              <Row label="Date of Occurrence" value={dateStr} />
+              <Row label="Time of Detection (WAT)" value={timeStr} />
+              <Row label="Cause / Classification" value={pack.cause} />
+              <Row
+                label="Phase at Report"
+                value={pack.phase.charAt(0).toUpperCase() + pack.phase.slice(1)}
+              />
+              <Row
+                label="Risk Score at Peak"
+                value={pack.riskScore !== null ? `${pack.riskScore}/100` : "N/A"}
+                mono
+              />
+              <Row
+                label="Time-to-Breach Estimate"
+                value={
+                  pack.timeToBreach !== null ? `${pack.timeToBreach} minutes` : "N/A"
+                }
+              />
+            </tbody>
+          </table>
+        </DocSection>
 
-        <Section title="5. Root Cause (RCA)" icon={Info}>
-          <p className="text-sm text-[#605E5C] leading-relaxed italic border-l-2 border-[#D2D0CE] pl-4 py-1">
+        {/* Section 2 — Impact Assessment */}
+        <DocSection num="2" title="Impact Assessment">
+          <table className="w-full text-xs border-collapse">
+            <tbody>
+              <Row
+                label="Total Impacted Subscribers (MSISDN)"
+                value={fmt(pack.impactedSubscribers)}
+                mono
+              />
+              <Row
+                label="Enterprise Lines Affected"
+                value={fmt(pack.enterpriseLines)}
+                mono
+              />
+              <Row
+                label="Estimated Revenue at Risk"
+                value={fmtNGN(pack.revenueAtRisk)}
+                mono
+              />
+              <Row
+                label="Regulatory Compensation Exposure"
+                value={fmtNGN(pack.compensationExposure)}
+                mono
+              />
+              <Row
+                label="NCC Regulatory Exposure"
+                value={pack.nccExposureSummary}
+              />
+            </tbody>
+          </table>
+        </DocSection>
+
+        {/* Section 3 — Affected Services & KPIs — side by side */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <DocSection num="3" title="Affected Services" inline>
+            <ul className="text-xs space-y-0.5 mt-1">
+              {pack.affectedServices.map((s) => (
+                <li key={s} className="flex gap-1.5">
+                  <span className="text-[#605E5C] font-mono">—</span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ul>
+          </DocSection>
+
+          <DocSection num="4" title="Network KPIs at Breach" inline>
+            <table className="w-full text-xs border-collapse mt-1">
+              <tbody>
+                {kpiEntries.map(([key, val]) => (
+                  <tr key={key} className="border-b border-[#EDEBE9]">
+                    <td className="py-0.5 pr-3 text-text-main w-2/3">{kpiLabel(key)}</td>
+                    <td className="py-0.5 font-mono font-semibold text-right">
+                      {typeof val === "number" ? val.toFixed(2) : String(val)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DocSection>
+        </div>
+
+        {/* Section 5 — Incident Timeline */}
+        <DocSection num="5" title="Incident Timeline">
+          <ol className="text-xs space-y-0.5 mt-1 list-none">
+            {pack.timeline.map((entry, i) => (
+              <li key={i} className="flex gap-2 border-b border-[#EDEBE9] py-1">
+                <span className="font-mono text-[#605E5C] flex-none w-4 text-right">
+                  {i + 1}.
+                </span>
+                <span className="text-[#1a1a1a]">{entry}</span>
+              </li>
+            ))}
+          </ol>
+        </DocSection>
+
+        {/* Section 6 — Root Cause Analysis */}
+        <DocSection num="6" title="Root Cause Analysis (RCA)">
+          <p className="text-xs leading-relaxed border-l-2 border-black pl-3 mt-1 text-[#1a1a1a]">
             {pack.rootCause}
           </p>
-        </Section>
+        </DocSection>
 
-        <Section title="6. Corrective Actions" icon={ShieldCheck}>
-          <div className="p-3 bg-[#FAF9F8] text-xs text-text-main leading-relaxed font-semibold border border-[#EDEBE9] rounded-md">
-            {pack.correctiveActions}
-          </div>
-        </Section>
+        {/* Section 7 — Corrective Actions */}
+        <DocSection num="7" title="Corrective Actions Taken / Planned">
+          <ol className="text-xs space-y-0.5 mt-1 list-none">
+            {pack.correctiveActions.map((action, i) => (
+              <li key={i} className="flex gap-2 border-b border-[#EDEBE9] py-1">
+                <span className="font-mono text-[#605E5C] flex-none w-4 text-right">
+                  {i + 1}.
+                </span>
+                <span>{action}</span>
+              </li>
+            ))}
+          </ol>
+        </DocSection>
 
-        <Section title="7. Evidence Logs" icon={FileText}>
-          <div className="bg-[#FAF9F8] p-3 rounded-md text-[#605E5C] font-mono text-[9px] leading-tight border border-[#EDEBE9]">
-            {pack.evidenceLogs}
-          </div>
-        </Section>
+        {/* Section 8 — Evidence Reference Log */}
+        <DocSection num="8" title="Evidence Reference Log">
+          <table className="w-full text-xs border-collapse mt-1">
+            <thead>
+              <tr className="border-b border-black">
+                <th className="text-left py-1 pr-4 font-semibold w-8">#</th>
+                <th className="text-left py-1 font-semibold">Evidence Entry</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pack.evidenceLogs.map((log, i) => (
+                <tr key={i} className="border-b border-[#EDEBE9]">
+                  <td className="py-0.5 pr-4 font-mono text-[#605E5C]">{i + 1}</td>
+                  <td className="py-0.5 font-mono text-[10px] text-text-main">{log}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DocSection>
+
+        {/* Footer */}
+        <div className="mt-6 pt-3 border-t border-black text-[9px] font-mono text-[#605E5C] flex justify-between">
+          <span>
+            Generated by RiskGuard AI — MTN Nigeria Network Operations Centre
+          </span>
+          <span>
+            {new Date().toLocaleDateString("en-NG", {
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            })}{" "}
+            · CONFIDENTIAL — NCC SUBMISSION
+          </span>
+        </div>
       </div>
-
     </div>
   );
 }
 
-function Section({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
+function DocSection({
+  num,
+  title,
+  children,
+  inline,
+}: {
+  num: string;
+  title: string;
+  children: React.ReactNode;
+  inline?: boolean;
+}) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 pb-2 border-b border-[#EDEBE9]">
-        <Icon size={15} className="text-[#605E5C]" />
-        <h3 className="text-xs font-bold text-text-main uppercase tracking-widest">{title}</h3>
+    <div className={inline ? "" : "mb-4"}>
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className="text-[9px] font-mono font-bold text-[#605E5C]">
+          {num}.
+        </span>
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-black">
+          {title}
+        </h3>
       </div>
-      <div>{children}</div>
+      {children}
     </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <tr className="border-b border-[#EDEBE9]">
+      <td className="py-1 pr-4 text-[#605E5C] w-1/2">{label}</td>
+      <td className={`py-1 text-[#1a1a1a] font-semibold ${mono ? "font-mono" : ""}`}>
+        {value}
+      </td>
+    </tr>
   );
 }

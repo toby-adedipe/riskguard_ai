@@ -176,4 +176,4 @@ for (const lga of ALL_LGA_META) {
   LGAS_BY_CITY[lga.city].push(lga);
 }
 
-export const DEFAULT_LGA_ID = "ikeja";
+export const DEFAULT_LGA_ID = "eti_osa";

@@ -4,7 +4,7 @@
  */
 
 import { QueryClient, QueryClientProvider, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TopBar } from "./components/layout/TopBar";
 import { RiskRadar } from "./components/risk/RiskRadar";
 import { LGASummaryPanel } from "./components/lga/LGASummaryPanel";
@@ -35,19 +35,13 @@ function Shell() {
   const [selectedLgaId, setSelectedLgaId] = useState<string>(DEFAULT_LGA_ID);
   const [showIncidentDetail, setShowIncidentDetail] = useState(false);
   const [activeTab, setActiveTab] = useState<"incident" | "compliance">("incident");
-  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(
-    () => localStorage.getItem("rg_incident_id"),
-  );
-  const [liveSessionId, setLiveSessionId] = useState<string | null>(
-    () => localStorage.getItem("rg_session_id"),
-  );
-  // showLive is separate from liveSessionId so "Dashboard" just hides the view
-  // without destroying the session — returning resumes where we left off.
-  const [showLive, setShowLive] = useState<boolean>(
-    () => !!localStorage.getItem("rg_session_id"),
-  );
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const [showLive, setShowLive] = useState<boolean>(false);
   const [agentThreshold, setAgentThreshold] = useState(65);
   const queryClient = useQueryClient();
+
+  const triggerSource = useRef<"key" | "button">("button");
 
   const triggerIkeja = useMutation({
     mutationFn: () =>
@@ -64,10 +58,31 @@ function Shell() {
         localStorage.setItem("rg_session_id", sessionId);
         setLiveSessionId(sessionId);
       }
-      setShowLive(true);
-      setShowIncidentDetail(true);
+      if (triggerSource.current === "button") {
+        setShowLive(true);
+        setShowIncidentDetail(true);
+      }
     },
   });
+
+  // Always wipe stale state and reset backend on mount so Ikeja starts green
+  useEffect(() => {
+    localStorage.removeItem("rg_session_id");
+    localStorage.removeItem("rg_incident_id");
+    localStorage.removeItem("rg_resolved_ikeja");
+    api.post("/simulation/reset").catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "`" && !liveSessionId && !triggerIkeja.isPending) {
+        triggerSource.current = "key";
+        triggerIkeja.mutate();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [liveSessionId, triggerIkeja]);
 
   const handleSelectLGA = (lgaId: string) => {
     setSelectedLgaId(lgaId);
@@ -87,6 +102,20 @@ function Shell() {
     }
   };
 
+  const handleApproved = (incident: { id: string; lgaId: string; cause: string; affectedSubs: number }) => {
+    const key = `rg_resolved_${incident.lgaId}`;
+    const existing = JSON.parse(localStorage.getItem(key) ?? "[]");
+    const newEntry = {
+      id: incident.id,
+      date: new Date().toISOString().slice(0, 10),
+      cause: incident.cause,
+      duration: "—",
+      affectedSubs: incident.affectedSubs,
+      resolved: true,
+    };
+    localStorage.setItem(key, JSON.stringify([newEntry, ...existing]));
+  };
+
   // Just hide the live view — session stays alive so returning resumes it
   const handleDismissLive = () => {
     setShowLive(false);
@@ -100,7 +129,9 @@ function Shell() {
     localStorage.removeItem("rg_session_id");
     localStorage.removeItem("rg_incident_id");
     if (oldSession) localStorage.removeItem(`rg_live_${oldSession}`);
+    if (oldSession) localStorage.removeItem(`rg_mitigated_${oldSession}`);
     if (oldIncident) localStorage.removeItem(`rg_chat_${oldIncident}`);
+    localStorage.removeItem("rg_resolved_ikeja");
     setLiveSessionId(null);
     setShowLive(false);
     triggerIkeja.mutate();
@@ -127,6 +158,7 @@ function Shell() {
           incidentId={selectedIncidentId}
           onDismiss={handleDismissLive}
           onRedo={handleRedo}
+          onApproved={handleApproved}
         />
       ) : (
         <main className="flex-1 flex overflow-hidden">

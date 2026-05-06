@@ -134,20 +134,21 @@ const DOMAIN_DIRECTIONS: Record<
   social_media: "lower_is_better", // sentiment — positive z-score = negative sentiment
 };
 
-function getDomainHealth(domainLabel: string, lgaId: string): number {
+function getDomainHealth(domainLabel: string, lgaId: string, recovered?: boolean): number {
   const domainKey = DOMAIN_MAPPING[domainLabel];
   if (!domainKey) return 50;
+
+  if (recovered) {
+    // Post-recovery: deterministic healthy values in 88–97% range
+    const seed = hashString(`recovered-${lgaId}-${domainKey}`);
+    return 88 + seededRandom(seed) * 9;
+  }
 
   const zScores = getDomainZScores(lgaId);
   const zScore = zScores[domainKey] ?? 0;
   const direction = DOMAIN_DIRECTIONS[domainKey];
 
-  // For "lower_is_better" metrics: negative/low z-score is good
-  // For "higher_is_better" metrics: positive/high z-score is good
   const effectiveScore = direction === "higher_is_better" ? zScore : -zScore;
-
-  // Convert effective score to health: higher effective score = healthier
-  // Scale: -10 to 10 => 0 to 100
   return Math.max(0, Math.min(100, (effectiveScore + 10) * 5));
 }
 
@@ -306,8 +307,16 @@ export function LGASummaryPanel({
   const risk = liveLga?.risk ?? 12;
   const meta = LGA_BY_ID[lgaId];
   const kpi = getKpi(lgaId);
-  const pastIncidents = PAST_INCIDENTS[lgaId] ?? [];
+  const storedResolved = JSON.parse(localStorage.getItem(`rg_resolved_${lgaId}`) ?? "[]") as PastIncident[];
+  const staticIncidents = lgaId === "ikeja" ? [] : (PAST_INCIDENTS[lgaId] ?? []);
+  const seen = new Set<string>();
+  const pastIncidents = [...storedResolved, ...staticIncidents].filter((inc) => {
+    if (seen.has(inc.id)) return false;
+    seen.add(inc.id);
+    return true;
+  });
   const isHighRisk = risk > 40;
+  const isRecovered = storedResolved.length > 0 && lgaId === "ikeja";
 
   // Whether this LGA can trigger a live investigation (only Ikeja has backend support)
   const canInvestigate = lgaId === "ikeja";
@@ -383,7 +392,7 @@ export function LGASummaryPanel({
               label="Avg Latency"
               value={`${kpi.latencyMs} ms`}
               sub="Core roundtrip"
-              tone={kpi.latencyMs > 50 ? "warning" : "neutral"}
+              tone={kpi.latencyMs > 50 ? "warning" : "success"}
             />
           </div>
         </div>
@@ -391,32 +400,44 @@ export function LGASummaryPanel({
         {/* CTA — show only if risk is elevated or it's Ikeja */}
         {(isHighRisk || canInvestigate) && (
           <div
-            className={`px-5 py-3 border-t ${isHighRisk ? "bg-danger-soft border-[#F5C6C7]" : "bg-blue-soft border-[#B3D7F2]"} flex items-center justify-between`}
+            className={`px-5 py-3 border-t flex items-center justify-between ${
+              isRecovered
+                ? "bg-success-soft border-[#A3D9A3]"
+                : isHighRisk
+                  ? "bg-danger-soft border-[#F5C6C7]"
+                  : "bg-blue-soft border-[#B3D7F2]"
+            }`}
           >
             <div className="flex items-center gap-2">
-              {isHighRisk ? (
+              {isRecovered ? (
+                <CheckCircle2 size={14} className="text-success" />
+              ) : isHighRisk ? (
                 <AlertTriangle size={14} className="text-danger" />
               ) : (
                 <Activity size={14} className="text-primary" />
               )}
               <p
-                className={`text-xs font-semibold ${isHighRisk ? "text-danger" : "text-primary"}`}
+                className={`text-xs font-semibold ${isRecovered ? "text-success" : isHighRisk ? "text-danger" : "text-primary"}`}
               >
-                {isHighRisk
-                  ? `Risk threshold breached — immediate investigation required`
-                  : `Simulate network incident for ${meta?.name ?? lgaId}`}
+                {isRecovered
+                  ? "Incident contained — network stabilising"
+                  : isHighRisk
+                    ? "Risk threshold breached — immediate investigation required"
+                    : `Simulate network incident for ${meta?.name ?? lgaId}`}
               </p>
             </div>
             <button
               onClick={onViewIncident}
               disabled={isTriggering}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors disabled:opacity-60 ${
-                isHighRisk
-                  ? "bg-danger text-white hover:bg-[#b02c30]"
-                  : "bg-primary text-white hover:bg-[#006CBE]"
+                isRecovered
+                  ? "bg-success text-white hover:bg-[#0a6a0a]"
+                  : isHighRisk
+                    ? "bg-danger text-white hover:bg-[#b02c30]"
+                    : "bg-primary text-white hover:bg-[#006CBE]"
               }`}
             >
-              {isTriggering ? "Launching..." : "View Active Incident"}
+              {isTriggering ? "Launching..." : isRecovered ? "View Incident Report" : "View Active Incident"}
               <ChevronRight size={13} />
             </button>
           </div>
@@ -440,8 +461,8 @@ export function LGASummaryPanel({
             "Recharge Velocity",
             "Social Media Sentiment",
           ].map((label) => {
-            const pct = getDomainHealth(label, lgaId);
-            const tone = getDomainHealthTone(label, pct);
+            const pct = getDomainHealth(label, lgaId, isRecovered);
+            const tone = lgaId === "ikeja" ? getDomainHealthTone(label, pct) : "#107C10";
             return (
               <div key={label}>
                 <div className="flex justify-between text-[10px] mb-1">
