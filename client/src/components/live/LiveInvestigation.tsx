@@ -829,6 +829,29 @@ const CHAT_ROLES = [
   { id: "compliance", label: "Compliance" },
 ];
 
+function chatStorageKey(incidentId: string) {
+  return `rg_chat_${incidentId}`;
+}
+
+function loadChatMessages(incidentId: string | null): ChatMessage[] {
+  if (!incidentId) return [];
+  try {
+    const raw = localStorage.getItem(chatStorageKey(incidentId));
+    return raw ? (JSON.parse(raw) as ChatMessage[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveChatMessages(incidentId: string | null, messages: ChatMessage[]) {
+  if (!incidentId) return;
+  try {
+    localStorage.setItem(chatStorageKey(incidentId), JSON.stringify(messages));
+  } catch {
+    // quota exceeded
+  }
+}
+
 function CopilotChat({
   state,
   incidentId,
@@ -838,8 +861,14 @@ function CopilotChat({
 }) {
   const [role, setRole] = useState<string>("network_risk");
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const idRef = useRef(0);
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    loadChatMessages(incidentId),
+  );
+  const idRef = useRef(messages.length);
+
+  useEffect(() => {
+    saveChatMessages(incidentId, messages);
+  }, [incidentId, messages]);
 
   const enabled =
     state.complete && incidentId !== null && !state.thresholdBlocked;

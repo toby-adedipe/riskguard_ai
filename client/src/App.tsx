@@ -96,11 +96,11 @@ function Shell() {
   // Clear everything and start a brand new investigation
   const handleRedo = () => {
     const oldSession = liveSessionId;
+    const oldIncident = selectedIncidentId;
     localStorage.removeItem("rg_session_id");
     localStorage.removeItem("rg_incident_id");
-    if (oldSession) {
-      localStorage.removeItem(`rg_live_${oldSession}`);
-    }
+    if (oldSession) localStorage.removeItem(`rg_live_${oldSession}`);
+    if (oldIncident) localStorage.removeItem(`rg_chat_${oldIncident}`);
     setLiveSessionId(null);
     setShowLive(false);
     triggerIkeja.mutate();
