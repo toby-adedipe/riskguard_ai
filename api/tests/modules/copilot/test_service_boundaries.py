@@ -155,7 +155,7 @@ class CopilotServiceBoundaryTestCase(unittest.TestCase):
 
     def test_report_document_parser_accepts_multiline_json_like_llm_output(self) -> None:
         payload = '''{
-  "title": "Incident Report: Ikeja Multi-Domain Service Degradation (INC-2025-IKEJA-001)",
+  "title": "Incident Report: Ikeja Multi-Domain Service Degradation (INC-2026-IKEJA-001)",
   "body_markdown": "## Executive Summary
 On 2026-05-05, RiskGuard AI detected and investigated a multi-domain service degradation.
 
@@ -169,16 +169,16 @@ The operator should preserve evidence."
 
         parsed = SemanticKernelReportDocumentRunner._parse_response(payload)
 
-        self.assertEqual(parsed.title, "Incident Report: Ikeja Multi-Domain Service Degradation (INC-2025-IKEJA-001)")
+        self.assertEqual(parsed.title, "Incident Report: Ikeja Multi-Domain Service Degradation (INC-2026-IKEJA-001)")
         self.assertIn("---PAGE BREAK---", parsed.body_markdown)
         self.assertIn("72.4%", parsed.body_markdown)
 
     def test_report_document_parser_accepts_truncated_body_markdown(self) -> None:
         payload = '''{
-  "title": "Incident Report: Ikeja Cluster Service Degradation and Billing/Commercial Impact (INC-2025-IKEJA-001)",
+  "title": "Incident Report: Ikeja Cluster Service Degradation and Billing/Commercial Impact (INC-2026-IKEJA-001)",
   "body_markdown": "Executive Summary
 
-Incident INC-2025-IKEJA-001 was triggered when the Risk score crossed the selected threshold.
+Incident INC-2026-IKEJA-001 was triggered when the Risk score crossed the selected threshold.
 
 Evidence Review
 Network degradation and customer complaints were correlated with BTS telemetry [evd:network-1].
@@ -188,7 +188,7 @@ BT'''
 
         self.assertEqual(
             parsed.title,
-            "Incident Report: Ikeja Cluster Service Degradation and Billing/Commercial Impact (INC-2025-IKEJA-001)",
+            "Incident Report: Ikeja Cluster Service Degradation and Billing/Commercial Impact (INC-2026-IKEJA-001)",
         )
         self.assertIn("Executive Summary", parsed.body_markdown)
         self.assertIn("BT", parsed.body_markdown)
@@ -246,7 +246,7 @@ BT'''
         return InvestigationTrigger(
             trigger_id="test-trigger-001",
             lga_id="ikeja",
-            incident_id="INC-2025-IKEJA-001",
+            incident_id="INC-2026-IKEJA-001",
             trigger_type="threshold",
             score=87.0,
             confidence=0.91,

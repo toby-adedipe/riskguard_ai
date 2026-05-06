@@ -12,12 +12,8 @@ import {
   useDerivedRoleProgress,
   useLiveStream,
 } from "../../lib/live";
-import {
-  CopilotResponse,
-  approveAction,
-  downloadInvestigationDocument,
-  fetchCopilot,
-} from "../../lib/api";
+import { CopilotResponse, approveAction, fetchCopilot } from "../../lib/api";
+import { exportInvestigationPdf } from "../../lib/pdf";
 import {
   Activity,
   ArrowLeft,
@@ -32,6 +28,40 @@ import {
   Sparkles,
 } from "lucide-react";
 
+// Same domain configuration as LGASummaryPanel for consistency
+const DOMAIN_LABELS: Record<string, string> = {
+  network: "Packet Loss & Latency",
+  bts: "BTS Power Stability",
+  complaints: "Customer Complaints",
+  billing: "Billing System",
+  recharge: "Recharge Velocity",
+  social_media: "Social Media Sentiment",
+};
+
+const DOMAIN_DIRECTIONS: Record<
+  string,
+  "higher_is_better" | "lower_is_better"
+> = {
+  network: "lower_is_better",
+  bts: "lower_is_better",
+  complaints: "lower_is_better",
+  billing: "lower_is_better",
+  recharge: "lower_is_better",
+  social_media: "lower_is_better",
+};
+
+function getDomainHealth(zScore: number, domain: string): number {
+  const direction = DOMAIN_DIRECTIONS[domain];
+  const effectiveScore = direction === "higher_is_better" ? zScore : -zScore;
+  return Math.max(0, Math.min(100, (effectiveScore + 10) * 5));
+}
+
+function getDomainHealthTone(health: number): string {
+  if (health > 70) return "#107C10";
+  if (health > 40) return "#FF8C00";
+  return "#D13438";
+}
+
 interface LiveInvestigationProps {
   sessionId: string;
   incidentId: string | null;
@@ -40,11 +70,23 @@ interface LiveInvestigationProps {
 
 const PHASE_COPY: Record<LiveState["phase"], { label: string; sub: string }> = {
   idle: { label: "Standing by", sub: "Awaiting trigger" },
-  telemetry: { label: "Telemetry climbing", sub: "Streaming live signals from Ikeja" },
+  telemetry: {
+    label: "Telemetry climbing",
+    sub: "Streaming live signals from Ikeja",
+  },
   wake: { label: "Agent activated", sub: "Risk threshold breached" },
-  investigating: { label: "Specialists investigating", sub: "Tools executing in real time" },
-  report: { label: "Report compiled", sub: "Recommendation ready for approval" },
-  complete: { label: "Investigation complete", sub: "Operator decision required" },
+  investigating: {
+    label: "Specialists investigating",
+    sub: "Tools executing in real time",
+  },
+  report: {
+    label: "Report compiled",
+    sub: "Recommendation ready for approval",
+  },
+  complete: {
+    label: "Investigation complete",
+    sub: "Operator decision required",
+  },
 };
 
 export function LiveInvestigation({
@@ -62,7 +104,11 @@ export function LiveInvestigation({
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-4 px-6 py-4 overflow-hidden">
         <main className="col-span-12 lg:col-span-8 overflow-y-auto pr-1 space-y-4">
           {state.report && state.complete && (
-            <FinalReportBanner state={state} sessionId={sessionId} onDismiss={onDismiss} />
+            <FinalReportBanner
+              state={state}
+              sessionId={sessionId}
+              onDismiss={onDismiss}
+            />
           )}
 
           <div className="grid grid-cols-3 gap-4">
@@ -77,7 +123,7 @@ export function LiveInvestigation({
           <TelemetryFeed state={state} />
         </main>
 
-        <aside className="col-span-12 lg:col-span-4 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden min-h-0">
+        <aside className="col-span-12 lg:col-span-4 flex flex-col bg-white border border-border-base rounded-xl overflow-hidden min-h-0 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
           <AgentSidePanel state={state} incidentId={incidentId} />
         </aside>
       </div>
@@ -98,30 +144,30 @@ function Header({
     ? { label: "Monitoring complete", sub: "Agent threshold not reached" }
     : PHASE_COPY[state.phase];
   return (
-    <header className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between flex-none">
+    <header className="px-6 py-4 border-b border-border-base bg-white flex items-center justify-between flex-none shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
       <div className="flex items-center gap-3">
         <button
           onClick={onDismiss}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#605E5C] border border-border-base rounded-md hover:bg-background transition-colors"
         >
           <ArrowLeft size={13} />
           Dashboard
         </button>
-        <div className="h-6 w-px bg-slate-200" />
+        <div className="h-6 w-px bg-border-base" />
         <div className="flex items-center gap-2.5">
-          <div className="relative w-9 h-9 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center">
-            <Sparkles size={16} className="text-blue-600" />
+          <div className="relative w-9 h-9 rounded-md bg-blue-soft border border-[#B3D7F2] flex items-center justify-center">
+            <Sparkles size={16} className="text-primary" />
             {state.phase !== "complete" && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
             )}
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-600">
-              Live Investigation · INC-2025-IKEJA-001
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+              Live Investigation · INC-2026-IKEJA-001
             </p>
-            <p className="text-sm font-semibold text-slate-900 leading-tight">
+            <p className="text-sm font-semibold text-text-main leading-tight">
               {phase.label}
-              <span className="text-slate-400 font-normal"> · {phase.sub}</span>
+              <span className="text-[#605E5C] font-normal"> · {phase.sub}</span>
             </p>
           </div>
         </div>
@@ -129,9 +175,9 @@ function Header({
 
       <div className="flex items-center gap-4">
         <PhaseTimeline state={state} />
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md">
-          <Activity size={12} className="text-slate-500" />
-          <span className="text-[11px] font-mono text-slate-600">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#FAF9F8] border border-border-base rounded-md">
+          <Activity size={12} className="text-[#605E5C]" />
+          <span className="text-[11px] font-mono text-[#605E5C]">
             {progress.done}/{progress.total} agents
           </span>
         </div>
@@ -168,22 +214,28 @@ function PhaseTimeline({ state }: { state: LiveState }) {
             <div
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full border transition-colors ${
                 active
-                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  ? "border-[#B3D7F2] bg-blue-soft text-primary"
                   : done
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-white text-slate-400"
+                    ? "border-[#A3D9A3] bg-success-soft text-success"
+                    : "border-border-base bg-white text-[#A19F9D]"
               }`}
             >
               <div
                 className={`w-1 h-1 rounded-full ${
-                  active ? "bg-blue-500 animate-pulse" : done ? "bg-emerald-500" : "bg-slate-300"
+                  active
+                    ? "bg-primary animate-pulse"
+                    : done
+                      ? "bg-success"
+                      : "bg-[#C8C6C4]"
                 }`}
               />
               <span className="text-[10px] font-semibold uppercase tracking-widest">
                 {step.label}
               </span>
             </div>
-            {i < steps.length - 1 && <ChevronRight size={11} className="text-slate-300" />}
+            {i < steps.length - 1 && (
+              <ChevronRight size={11} className="text-[#C8C6C4]" />
+            )}
           </div>
         );
       })}
@@ -200,14 +252,14 @@ function ScoreGauge({ state }: { state: LiveState }) {
 
   const color =
     state.severity === "red"
-      ? "#DC2626"
+      ? "#D13438"
       : state.severity === "amber"
-        ? "#F59E0B"
-        : "#16A34A";
+        ? "#FF8C00"
+        : "#107C10";
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col items-center h-full">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 mb-3">
+    <div className="bg-white border border-border-base rounded-xl p-5 flex flex-col items-center h-full shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#605E5C] mb-3">
         Live risk score
       </p>
       <div className="relative" style={{ width: size, height: size }}>
@@ -217,7 +269,7 @@ function ScoreGauge({ state }: { state: LiveState }) {
             cy={size / 2}
             r={radius}
             fill="transparent"
-            stroke="#E2E8F0"
+            stroke="#EDEBE9"
             strokeWidth={10}
           />
           <motion.circle
@@ -245,14 +297,18 @@ function ScoreGauge({ state }: { state: LiveState }) {
           >
             {Math.round(state.score)}
           </motion.span>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-1">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-[#605E5C] mt-1">
             of 100
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 w-full mt-5 pt-4 border-t border-slate-100">
-        <Stat label="Severity" value={state.severity.toUpperCase()} tone={state.severity} />
+      <div className="grid grid-cols-3 gap-2 w-full mt-5 pt-4 border-t border-[#EDEBE9]">
+        <Stat
+          label="Severity"
+          value={state.severity.toUpperCase()}
+          tone={state.severity}
+        />
         <Stat
           label="TTB"
           value={state.ttbMinutes !== null ? `${state.ttbMinutes}m` : "—"}
@@ -278,15 +334,15 @@ function Stat({
   tone: "red" | "amber" | "green" | "neutral";
 }) {
   const color = {
-    red: "text-red-600",
-    amber: "text-amber-600",
-    green: "text-emerald-600",
-    neutral: "text-slate-900",
+    red: "text-danger",
+    amber: "text-warning",
+    green: "text-success",
+    neutral: "text-text-main",
   }[tone];
 
   return (
     <div className="flex flex-col items-center">
-      <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400">
+      <p className="text-[9px] font-semibold uppercase tracking-widest text-[#605E5C]">
         {label}
       </p>
       <p className={`text-sm font-mono font-semibold ${color}`}>{value}</p>
@@ -298,47 +354,61 @@ function DomainBreakdown({ state }: { state: LiveState }) {
   const domains = Object.entries(state.domainZScores);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 h-full">
+    <div className="bg-white border border-border-base rounded-xl p-5 h-full shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#605E5C]">
           Domain anomaly stack
         </p>
-        <span className="text-[10px] font-mono text-slate-400">
+        <span className="text-[10px] font-mono text-[#605E5C]">
           {domains.length} domains tracked
         </span>
       </div>
       <div className="space-y-3">
         {domains.length === 0 && (
-          <p className="text-xs text-slate-400 italic">
+          <p className="text-xs text-[#605E5C] italic">
             Awaiting first telemetry tick…
           </p>
         )}
         {domains.map(([domain, z]) => {
-          const intensity = Math.min(Math.abs(z) / 7, 1);
-          const tone =
-            intensity > 0.7
-              ? "bg-red-500"
-              : intensity > 0.4
-                ? "bg-amber-400"
-                : "bg-emerald-500";
+          const health = getDomainHealth(z, domain);
+          const tone = getDomainHealthTone(health);
+          const label = DOMAIN_LABELS[domain] || domain;
+
+          const severityLabel =
+            health < 30
+              ? {
+                  text: "Critical",
+                  color: "text-danger bg-danger-soft border-[#F5C6C7]",
+                }
+              : health < 70
+                ? {
+                    text: "Elevated",
+                    color: "text-warning bg-warning-soft border-[#FFD08A]",
+                  }
+                : {
+                    text: "Normal",
+                    color: "text-success bg-success-soft border-[#A3D9A3]",
+                  };
+
           return (
             <div key={domain}>
               <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-slate-700 capitalize font-medium">
-                  {domain.replace(/_/g, " ")}
+                <span className="text-text-main capitalize font-medium">
+                  {label}
                 </span>
-                <span className="text-slate-500 font-mono text-[11px]">
-                  z = {z >= 0 ? "+" : ""}
-                  {z.toFixed(2)}σ
+                <span
+                  className={`px-1.5 py-0.5 rounded-sm text-[9px] font-bold border ${severityLabel.color}`}
+                >
+                  {severityLabel.text}
                 </span>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-background rounded-full overflow-hidden">
                 <motion.div
-                  className={`${tone} rounded-full`}
+                  className="rounded-full"
                   initial={{ width: 0 }}
-                  animate={{ width: `${intensity * 100}%` }}
+                  animate={{ width: `${health}%` }}
                   transition={{ duration: 0.5 }}
-                  style={{ height: "100%" }}
+                  style={{ height: "100%", background: tone }}
                 />
               </div>
             </div>
@@ -350,22 +420,27 @@ function DomainBreakdown({ state }: { state: LiveState }) {
 }
 
 function TelemetryFeed({ state }: { state: LiveState }) {
-  const recent = useMemo(() => state.signalFeed.slice(-30).reverse(), [state.signalFeed]);
+  const recent = useMemo(
+    () => state.signalFeed.slice(-30).reverse(),
+    [state.signalFeed],
+  );
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+    <div className="bg-white border border-border-base rounded-xl flex flex-col overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-[#EDEBE9]">
         <div className="flex items-center gap-2">
-          <Radio size={14} className="text-emerald-600" />
-          <p className="text-sm font-semibold text-slate-900">Live telemetry stream</p>
+          <Radio size={14} className="text-success" />
+          <p className="text-sm font-semibold text-text-main">
+            Live telemetry stream
+          </p>
         </div>
-        <span className="text-[11px] font-mono text-slate-500">
+        <span className="text-[11px] font-mono text-[#605E5C]">
           {state.signalFeed.length} signals captured
         </span>
       </div>
       <div className="max-h-[420px] overflow-y-auto p-4 space-y-2">
         {recent.length === 0 && (
-          <p className="text-xs text-slate-400 italic px-2">
+          <p className="text-xs text-[#605E5C] italic px-2">
             No signals yet. Telemetry will appear here as Ikeja sites report in.
           </p>
         )}
@@ -374,10 +449,10 @@ function TelemetryFeed({ state }: { state: LiveState }) {
             const intensity = Math.min(Math.abs(signal.z_score) / 7, 1);
             const tone =
               intensity > 0.7
-                ? "border-red-200 bg-red-50 text-red-900"
+                ? "border-[#F5C6C7] bg-danger-soft text-danger"
                 : intensity > 0.4
-                  ? "border-amber-200 bg-amber-50 text-amber-900"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-900";
+                  ? "border-[#FFD08A] bg-warning-soft text-[#7B5A00]"
+                  : "border-[#A3D9A3] bg-success-soft text-[#054A05]";
             return (
               <motion.div
                 key={signal.uid}
@@ -385,7 +460,7 @@ function TelemetryFeed({ state }: { state: LiveState }) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className={`border rounded-lg px-3 py-2 ${tone}`}
+                className={`border rounded-md px-3 py-2 ${tone}`}
               >
                 <p className="text-xs leading-snug">{humanizeSignal(signal)}</p>
               </motion.div>
@@ -395,10 +470,10 @@ function TelemetryFeed({ state }: { state: LiveState }) {
       </div>
 
       {state.incidentOpened && (
-        <div className="px-5 py-3 border-t border-red-200 bg-red-50">
-          <p className="text-xs font-medium text-red-700 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-            Incident opened · INC-2025-IKEJA-001
+        <div className="px-5 py-3 border-t border-[#F5C6C7] bg-danger-soft">
+          <p className="text-xs font-medium text-danger flex items-center gap-2">
+            <span className="w-1.5 h-1.5 bg-danger rounded-full animate-pulse" />
+            Incident opened · INC-2026-IKEJA-001
           </p>
         </div>
       )}
@@ -415,20 +490,22 @@ function AgentSidePanel({
 }) {
   return (
     <>
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-none">
+      <div className="px-5 py-4 border-b border-[#EDEBE9] flex items-center justify-between flex-none bg-[#FAF9F8]">
         <div className="flex items-center gap-2">
-          <Brain size={15} className="text-blue-600" />
+          <Brain size={15} className="text-primary" />
           <div>
-            <p className="text-sm font-semibold text-slate-900">Agent activity</p>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-sm font-semibold text-text-main">
+              Agent activity
+            </p>
+            <p className="text-[11px] text-[#605E5C]">
               {state.thoughts.length} thoughts · {state.roles.length} dispatches
             </p>
           </div>
         </div>
         {state.phase === "investigating" && (
-          <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 border border-blue-200">
-            <Loader2 size={10} className="animate-spin text-blue-600" />
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-700">
+          <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-soft border border-[#B3D7F2]">
+            <Loader2 size={10} className="animate-spin text-primary" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
               Reasoning
             </span>
           </span>
@@ -456,18 +533,21 @@ function AgentTimeline({ state }: { state: LiveState }) {
   const showActivating = thread.length === 0 && state.phase === "wake";
 
   return (
-    <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+    <div
+      ref={scrollRef}
+      className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3"
+    >
       {showWaiting && (
-        <div className="p-4 border border-dashed border-slate-200 rounded-lg text-center text-slate-400 text-xs">
-          Orchestrator dormant — will wake once the score crosses the multi-domain
-          anomaly threshold.
+        <div className="p-4 border border-dashed border-border-base rounded-lg text-center text-[#605E5C] text-xs">
+          Orchestrator dormant — will wake once the score crosses the
+          multi-domain anomaly threshold.
         </div>
       )}
       {showActivating && (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 border border-blue-200 bg-blue-50 rounded-lg text-center text-blue-700 text-xs flex items-center justify-center gap-2"
+          className="p-4 border border-[#B3D7F2] bg-blue-soft rounded-lg text-center text-primary text-xs flex items-center justify-center gap-2"
         >
           <Loader2 size={14} className="animate-spin" />
           Orchestrator activating — choosing specialists…
@@ -483,14 +563,14 @@ function AgentTimeline({ state }: { state: LiveState }) {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
-              className="flex gap-2.5 p-3 rounded-lg border border-blue-100 bg-blue-50/60"
+              className="flex gap-2.5 p-3 rounded-lg border border-[#B3D7F2] bg-blue-soft/60"
             >
-              <Brain size={13} className="text-blue-600 flex-none mt-0.5" />
+              <Brain size={13} className="text-primary flex-none mt-0.5" />
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-700/80 mb-0.5">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-primary mb-0.5">
                   Orchestrator thought
                 </p>
-                <p className="text-xs text-slate-700 leading-relaxed">
+                <p className="text-xs text-text-main leading-relaxed">
                   {item.thought!.text}
                 </p>
               </div>
@@ -521,31 +601,33 @@ function RoleCard({ role }: { role: RoleState }) {
   const isDone = role.status === "done";
 
   const containerTone = isActive
-    ? "border-blue-200 bg-white shadow-[0_2px_12px_rgba(37,99,235,0.06)]"
+    ? "border-[#B3D7F2] bg-white shadow-[0_2px_12px_rgba(0,120,212,0.08)]"
     : isDone
-      ? "border-emerald-200 bg-emerald-50/30"
-      : "border-slate-200 bg-slate-50/40";
+      ? "border-[#A3D9A3] bg-success-soft/30"
+      : "border-border-base bg-[#FAF9F8]/40";
 
   return (
-    <div className={`border rounded-lg overflow-hidden transition-all ${containerTone}`}>
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 bg-white">
+    <div
+      className={`border rounded-lg overflow-hidden transition-all ${containerTone}`}
+    >
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#EDEBE9] bg-white">
         <div className="flex items-center gap-2.5">
           <div
             className={`w-7 h-7 rounded-md flex items-center justify-center ${
               isActive
-                ? "bg-blue-50 text-blue-600 border border-blue-100"
+                ? "bg-blue-soft text-primary border border-[#B3D7F2]"
                 : isDone
-                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                  : "bg-slate-50 text-slate-400 border border-slate-100"
+                  ? "bg-success-soft text-success border border-[#A3D9A3]"
+                  : "bg-background text-[#A19F9D] border border-border-base"
             }`}
           >
             <Icon size={14} />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-900 leading-tight">
+            <p className="text-xs font-semibold text-text-main leading-tight">
               {meta.label}
             </p>
-            <p className="text-[10px] text-slate-500 leading-tight">
+            <p className="text-[10px] text-[#605E5C] leading-tight">
               {humanizeRoleStart(meta.label)}
             </p>
           </div>
@@ -566,18 +648,26 @@ function RoleCard({ role }: { role: RoleState }) {
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-1 px-2.5 py-2 rounded border border-slate-100 bg-white text-[11px]"
+                className="flex flex-col gap-1 px-2.5 py-2 rounded-md border border-[#EDEBE9] bg-white text-[11px]"
               >
                 <div className="flex items-center gap-2">
                   {isPending ? (
-                    <Loader2 size={10} className="animate-spin text-blue-600 flex-none" />
+                    <Loader2
+                      size={10}
+                      className="animate-spin text-primary flex-none"
+                    />
                   ) : (
-                    <CheckCircle2 size={10} className="text-emerald-600 flex-none" />
+                    <CheckCircle2
+                      size={10}
+                      className="text-success flex-none"
+                    />
                   )}
-                  <span className="text-slate-700 truncate flex-1">{call.description}</span>
+                  <span className="text-text-main truncate flex-1">
+                    {call.description}
+                  </span>
                 </div>
                 {call.summary && (
-                  <span className="text-[10px] text-slate-500 pl-5 leading-snug">
+                  <span className="text-[10px] text-[#605E5C] pl-5 leading-snug">
                     → {call.summary}
                   </span>
                 )}
@@ -589,8 +679,10 @@ function RoleCard({ role }: { role: RoleState }) {
             <div className="space-y-1">
               {role.facts.map((fact) => (
                 <div key={fact.id} className="flex gap-2 text-xs">
-                  <span className="text-blue-600 mt-0.5">●</span>
-                  <span className="text-slate-700 leading-snug">{fact.claim}</span>
+                  <span className="text-primary mt-0.5">●</span>
+                  <span className="text-text-main leading-snug">
+                    {fact.claim}
+                  </span>
                 </div>
               ))}
             </div>
@@ -600,10 +692,10 @@ function RoleCard({ role }: { role: RoleState }) {
             <div className="space-y-1">
               {role.inferences.map((inf) => (
                 <div key={inf.id} className="flex gap-2 text-xs">
-                  <span className="text-amber-600 mt-0.5">◇</span>
-                  <span className="text-slate-700 italic leading-snug">
+                  <span className="text-warning mt-0.5">◇</span>
+                  <span className="text-text-main italic leading-snug">
                     {inf.claim}{" "}
-                    <span className="not-italic text-slate-400 font-mono text-[10px]">
+                    <span className="not-italic text-[#605E5C] font-mono text-[10px]">
                       ({Math.round(inf.confidence * 100)}%)
                     </span>
                   </span>
@@ -617,13 +709,13 @@ function RoleCard({ role }: { role: RoleState }) {
               {role.recommendations.map((rec) => (
                 <div
                   key={rec.id}
-                  className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded bg-emerald-50 border border-emerald-200"
+                  className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-success-soft border border-[#A3D9A3]"
                 >
-                  <span className="text-xs font-semibold text-emerald-800">
+                  <span className="text-xs font-semibold text-[#054A05]">
                     {rec.label}
                   </span>
                   {rec.requiresApproval && (
-                    <span className="text-[9px] font-mono uppercase tracking-widest text-emerald-700/80">
+                    <span className="text-[9px] font-mono uppercase tracking-widest text-success">
                       needs approval
                     </span>
                   )}
@@ -635,8 +727,8 @@ function RoleCard({ role }: { role: RoleState }) {
       )}
 
       {role.synthesis && isDone && (
-        <div className="px-3 py-2 border-t border-emerald-200 bg-emerald-50">
-          <p className="text-[11px] text-emerald-800 leading-snug">
+        <div className="px-3 py-2 border-t border-[#A3D9A3] bg-success-soft/60">
+          <p className="text-[11px] text-[#054A05] leading-snug">
             {humanizeRoleComplete(meta.label, role.synthesis)}
           </p>
         </div>
@@ -648,9 +740,9 @@ function RoleCard({ role }: { role: RoleState }) {
 function RoleStatusPill({ status }: { status: RoleState["status"] }) {
   if (status === "running") {
     return (
-      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200">
-        <Loader2 size={9} className="animate-spin text-blue-600" />
-        <span className="text-[9px] font-semibold uppercase tracking-widest text-blue-700">
+      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-soft border border-[#B3D7F2]">
+        <Loader2 size={9} className="animate-spin text-primary" />
+        <span className="text-[9px] font-semibold uppercase tracking-widest text-primary">
           Working
         </span>
       </div>
@@ -658,17 +750,17 @@ function RoleStatusPill({ status }: { status: RoleState["status"] }) {
   }
   if (status === "done") {
     return (
-      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
-        <CheckCircle2 size={9} className="text-emerald-600" />
-        <span className="text-[9px] font-semibold uppercase tracking-widest text-emerald-700">
+      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success-soft border border-[#A3D9A3]">
+        <CheckCircle2 size={9} className="text-success" />
+        <span className="text-[9px] font-semibold uppercase tracking-widest text-success">
           Done
         </span>
       </div>
     );
   }
   return (
-    <div className="px-1.5 py-0.5 rounded-full bg-slate-100 border border-slate-200">
-      <span className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">
+    <div className="px-1.5 py-0.5 rounded-full bg-background border border-border-base">
+      <span className="text-[9px] font-semibold uppercase tracking-widest text-[#605E5C]">
         Idle
       </span>
     </div>
@@ -703,11 +795,15 @@ function CopilotChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const idRef = useRef(0);
 
-  const enabled = state.complete && incidentId !== null && !state.thresholdBlocked;
+  const enabled =
+    state.complete && incidentId !== null && !state.thresholdBlocked;
 
   const mutation = useMutation({
-    mutationFn: (payload: { role: string; query: string; incident_id: string }) =>
-      fetchCopilot(payload),
+    mutationFn: (payload: {
+      role: string;
+      query: string;
+      incident_id: string;
+    }) => fetchCopilot(payload),
     onSuccess: (data, variables) => {
       idRef.current += 1;
       setMessages((prev) =>
@@ -747,21 +843,21 @@ function CopilotChat({
     ? "Ask the copilot about the incident…"
     : state.thresholdBlocked
       ? "Copilot held — selected agent threshold was not reached."
-    : state.complete
-      ? "Chat unavailable — no incident bound."
-      : "Available once the investigation completes.";
+      : state.complete
+        ? "Chat unavailable — no incident bound."
+        : "Available once the investigation completes.";
 
   return (
-    <div className="border-t border-slate-100 bg-slate-50 flex-none">
+    <div className="border-t border-[#EDEBE9] bg-[#FAF9F8] flex-none">
       {messages.length > 0 && (
-        <div className="max-h-[220px] overflow-y-auto px-4 py-3 space-y-2.5 border-b border-slate-100">
+        <div className="max-h-[220px] overflow-y-auto px-4 py-3 space-y-2.5 border-b border-[#EDEBE9]">
           {messages.map((msg) => (
             <div key={msg.id}>
               <ChatBubble msg={msg} />
             </div>
           ))}
           {mutation.isPending && (
-            <div className="flex items-center gap-2 text-[11px] text-slate-500 pl-1">
+            <div className="flex items-center gap-2 text-[11px] text-[#605E5C] pl-1">
               <Loader2 size={11} className="animate-spin" />
               Copilot is thinking…
             </div>
@@ -771,12 +867,12 @@ function CopilotChat({
 
       <form onSubmit={send} className="px-3 py-3 space-y-2">
         <div className="flex items-center gap-2">
-          <Bot size={13} className="text-slate-500" />
+          <Bot size={13} className="text-[#605E5C]" />
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
             disabled={!enabled}
-            className="flex-1 text-[11px] border border-slate-200 rounded px-2 py-1 bg-white outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
+            className="flex-1 text-[11px] border border-border-base rounded-sm px-2 py-1 bg-white outline-none focus:ring-1 focus:ring-primary disabled:opacity-60 text-text-main"
           >
             {CHAT_ROLES.map((r) => (
               <option key={r.id} value={r.id}>
@@ -792,12 +888,12 @@ function CopilotChat({
             onChange={(e) => setDraft(e.target.value)}
             placeholder={placeholder}
             disabled={!enabled || mutation.isPending}
-            className="flex-1 text-xs px-3 py-2 border border-slate-200 rounded bg-white outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
+            className="flex-1 text-xs px-3 py-2 border border-border-base rounded-sm bg-white outline-none focus:ring-1 focus:ring-primary disabled:bg-background disabled:text-[#A19F9D] text-text-main placeholder:text-[#A19F9D]"
           />
           <button
             type="submit"
             disabled={!enabled || mutation.isPending || !draft.trim()}
-            className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 px-3 py-2 bg-primary text-white rounded-sm text-xs font-semibold hover:bg-[#006CBE] transition-colors disabled:opacity-50"
           >
             <Send size={12} />
             Send
@@ -812,7 +908,7 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
   if (msg.who === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] px-3 py-2 bg-blue-600 text-white rounded-lg rounded-br-sm text-xs leading-relaxed">
+        <div className="max-w-[85%] px-3 py-2 bg-primary text-white rounded-lg rounded-br-sm text-xs leading-relaxed">
           {msg.text}
         </div>
       </div>
@@ -822,34 +918,37 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
   if (!msg.response) {
     return (
       <div className="flex justify-start">
-        <div className="max-w-[85%] px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg rounded-bl-sm text-xs leading-relaxed">
+        <div className="max-w-[85%] px-3 py-2 bg-white border border-border-base text-text-main rounded-lg rounded-bl-sm text-xs leading-relaxed">
           {msg.text}
         </div>
       </div>
     );
   }
 
-  const roleLabel = CHAT_ROLES.find((r) => r.id === msg.role)?.label ?? msg.role;
+  const roleLabel =
+    CHAT_ROLES.find((r) => r.id === msg.role)?.label ?? msg.role;
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[92%] w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg rounded-bl-sm text-xs space-y-2">
+      <div className="max-w-[92%] w-full px-3 py-2.5 bg-white border border-border-base rounded-lg rounded-bl-sm text-xs space-y-2">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-widest">
-          <span className="font-semibold text-slate-500">{roleLabel} agent</span>
+          <span className="font-semibold text-[#605E5C]">
+            {roleLabel} agent
+          </span>
           <span
             className={`px-1.5 py-0.5 rounded-full font-mono ${
               msg.response.validation_status === "passed"
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                ? "bg-success-soft text-success border border-[#A3D9A3]"
                 : msg.response.validation_status === "revised"
-                  ? "bg-amber-50 text-amber-700 border border-amber-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
+                  ? "bg-warning-soft text-warning border border-[#FFD08A]"
+                  : "bg-danger-soft text-danger border border-[#F5C6C7]"
             }`}
           >
             {msg.response.validation_status}
           </span>
         </div>
 
-        <p className="text-[12px] leading-relaxed text-slate-800">
+        <p className="text-[12px] leading-relaxed text-text-main">
           {msg.response.answer}
         </p>
 
@@ -857,7 +956,11 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
           <CopilotBlock label="Facts" tone="blue" body={msg.response.facts} />
         )}
         {msg.response.inferences && (
-          <CopilotBlock label="Inferences" tone="amber" body={msg.response.inferences} />
+          <CopilotBlock
+            label="Inferences"
+            tone="amber"
+            body={msg.response.inferences}
+          />
         )}
         {msg.response.recommendations && (
           <CopilotBlock
@@ -867,8 +970,8 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
           />
         )}
         {msg.response.sources.length > 0 && (
-          <div className="pt-1 border-t border-slate-100">
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+          <div className="pt-1 border-t border-[#EDEBE9]">
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-[#605E5C] mb-1">
               Sources
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -876,7 +979,7 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
                 <span
                   key={source.evidenceId}
                   title={source.label}
-                  className="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[9px] font-mono text-slate-600"
+                  className="px-1.5 py-0.5 rounded-sm border border-border-base bg-[#FAF9F8] text-[9px] font-mono text-[#605E5C]"
                 >
                   {source.evidenceId}
                 </span>
@@ -899,12 +1002,14 @@ function CopilotBlock({
   body: string;
 }) {
   const styles = {
-    blue: "border-blue-100 bg-blue-50/60 text-blue-900",
-    amber: "border-amber-100 bg-amber-50/60 text-amber-900",
-    emerald: "border-emerald-100 bg-emerald-50/60 text-emerald-900",
+    blue: "border-[#B3D7F2] bg-blue-soft/60 text-[#004578]",
+    amber: "border-[#FFD08A] bg-warning-soft/60 text-[#7B5A00]",
+    emerald: "border-[#A3D9A3] bg-success-soft/60 text-[#054A05]",
   }[tone];
   return (
-    <div className={`border rounded p-2 text-[11px] leading-relaxed ${styles}`}>
+    <div
+      className={`border rounded-md p-2 text-[11px] leading-relaxed ${styles}`}
+    >
       <p className="text-[9px] font-semibold uppercase tracking-widest opacity-70 mb-1">
         {label}
       </p>
@@ -924,7 +1029,8 @@ function FinalReportBanner({
 }) {
   const queryClient = useQueryClient();
   const report = state.report!;
-  const recommendation = report.recommended_action_label ?? "No action recommended";
+  const recommendation =
+    report.recommended_action_label ?? "No action recommended";
 
   const approveMutation = useMutation({
     mutationFn: () =>
@@ -940,9 +1046,25 @@ function FinalReportBanner({
     },
   });
 
-  const documentMutation = useMutation({
-    mutationFn: () => downloadInvestigationDocument(report.harness_run_id),
-  });
+  const [pdfExporting, setPdfExporting] = useState(false);
+
+  const handleDownloadPdf = () => {
+    setPdfExporting(true);
+    setTimeout(() => {
+      exportInvestigationPdf({
+        incident_id: report.incident_id,
+        harness_run_id: report.harness_run_id,
+        summary: report.summary ?? "",
+        recommended_action_label: report.recommended_action_label,
+        recommended_action: report.recommended_action,
+        selected_roles: report.selected_roles,
+        evidence_count: report.evidence_count,
+        do_nothing_curve: report.do_nothing_curve ?? [],
+        recovery_curve: report.recovery_curve ?? [],
+      });
+      setPdfExporting(false);
+    }, 50);
+  };
 
   const curve = useMemo(() => {
     const dn = report.do_nothing_curve ?? [];
@@ -960,51 +1082,55 @@ function FinalReportBanner({
       key={sessionId}
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white border border-emerald-200 rounded-xl p-5 shadow-sm"
+      className="bg-white border border-[#A3D9A3] rounded-xl p-5 shadow-[0_2px_12px_rgba(16,124,16,0.08)]"
     >
       <div className="flex items-start justify-between mb-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700 mb-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-success mb-1">
             Recommendation ready
           </p>
-          <h2 className="text-xl font-semibold text-slate-900 leading-tight tracking-tight">
+          <h2 className="text-xl font-semibold text-text-main leading-tight tracking-tight">
             {recommendation}
           </h2>
-          <p className="text-sm text-slate-500 mt-1">{report.summary}</p>
+          <p className="text-sm text-[#605E5C] mt-1">{report.summary}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 bg-slate-50 border border-slate-100 rounded-lg p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+        <div className="md:col-span-2 bg-[#FAF9F8] border border-[#EDEBE9] rounded-lg p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#605E5C] mb-2">
             Do nothing vs. {recommendation}
           </p>
           <CurveChart data={curve} />
         </div>
-        <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 flex flex-col">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">
+        <div className="bg-[#FAF9F8] border border-[#EDEBE9] rounded-lg p-4 flex flex-col">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#605E5C] mb-2">
             Decision trail
           </p>
-          <p className="text-xs text-slate-700">
-            <span className="text-slate-500">Roles dispatched:</span>{" "}
-            <span className="font-mono font-semibold">{report.selected_roles.length}</span>
+          <p className="text-xs text-text-main">
+            <span className="text-[#605E5C]">Roles dispatched:</span>{" "}
+            <span className="font-mono font-semibold">
+              {report.selected_roles.length}
+            </span>
           </p>
-          <p className="text-xs text-slate-700 mt-1">
-            <span className="text-slate-500">Evidence collected:</span>{" "}
-            <span className="font-mono font-semibold">{report.evidence_count}</span>
+          <p className="text-xs text-text-main mt-1">
+            <span className="text-[#605E5C]">Evidence collected:</span>{" "}
+            <span className="font-mono font-semibold">
+              {report.evidence_count}
+            </span>
           </p>
           <button
-            onClick={() => documentMutation.mutate()}
-            disabled={documentMutation.isPending}
-            className="mt-auto mb-2 px-4 py-2 border border-blue-200 bg-white hover:bg-blue-50 disabled:opacity-50 text-blue-700 font-semibold text-xs rounded transition-colors flex items-center justify-center gap-1.5"
+            onClick={handleDownloadPdf}
+            disabled={pdfExporting}
+            className="mt-auto mb-2 px-4 py-2 border border-[#B3D7F2] bg-white hover:bg-blue-soft disabled:opacity-50 text-primary font-semibold text-xs rounded-md transition-colors flex items-center justify-center gap-1.5"
           >
             <Download size={13} />
-            {documentMutation.isPending ? "Compiling PDF..." : "Download PDF"}
+            {pdfExporting ? "Generating PDF..." : "Download report"}
           </button>
           <button
             onClick={() => approveMutation.mutate()}
             disabled={approveMutation.isPending || !report.recommended_action}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-xs rounded transition-colors"
+            className="px-4 py-2 bg-success hover:bg-[#0a5a0a] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-xs rounded-md transition-colors"
           >
             {approveMutation.isPending ? "Approving…" : "Approve & mitigate"}
           </button>
@@ -1017,10 +1143,18 @@ function FinalReportBanner({
 function CurveChart({
   data,
 }: {
-  data: { step: number; do_nothing: number | null; with_action: number | null }[];
+  data: {
+    step: number;
+    do_nothing: number | null;
+    with_action: number | null;
+  }[];
 }) {
   if (data.length === 0) {
-    return <p className="text-[11px] text-slate-400 italic">No projection available</p>;
+    return (
+      <p className="text-[11px] text-[#605E5C] italic">
+        No projection available
+      </p>
+    );
   }
   const width = 360;
   const height = 100;
@@ -1044,13 +1178,17 @@ function CurveChart({
   };
 
   return (
-    <svg width="100%" height={height + 20} viewBox={`0 0 ${width} ${height + 20}`}>
+    <svg
+      width="100%"
+      height={height + 20}
+      viewBox={`0 0 ${width} ${height + 20}`}
+    >
       <line
         x1={0}
         x2={width}
         y1={height - (42 / yMax) * height}
         y2={height - (42 / yMax) * height}
-        stroke="#cbd5e1"
+        stroke="#D2D0CE"
         strokeDasharray="3 3"
       />
       <text
@@ -1058,18 +1196,32 @@ function CurveChart({
         y={height - (42 / yMax) * height - 4}
         fontSize={9}
         textAnchor="end"
-        fill="#64748b"
-        fontFamily="ui-monospace"
+        fill="#605E5C"
+        fontFamily="Consolas, ui-monospace"
       >
         recovery floor 42
       </text>
-      <path d={buildPath("do_nothing")} stroke="#DC2626" strokeWidth={2} fill="none" />
-      <path d={buildPath("with_action")} stroke="#16A34A" strokeWidth={2} fill="none" />
-      <g fontSize={9} fontFamily="ui-monospace" fill="#64748b">
-        <circle cx={6} cy={height + 12} r={3} fill="#DC2626" />
-        <text x={14} y={height + 15}>do nothing</text>
-        <circle cx={100} cy={height + 12} r={3} fill="#16A34A" />
-        <text x={108} y={height + 15}>recommended</text>
+      <path
+        d={buildPath("do_nothing")}
+        stroke="#D13438"
+        strokeWidth={2}
+        fill="none"
+      />
+      <path
+        d={buildPath("with_action")}
+        stroke="#107C10"
+        strokeWidth={2}
+        fill="none"
+      />
+      <g fontSize={9} fontFamily="Consolas, ui-monospace" fill="#605E5C">
+        <circle cx={6} cy={height + 12} r={3} fill="#D13438" />
+        <text x={14} y={height + 15}>
+          do nothing
+        </text>
+        <circle cx={100} cy={height + 12} r={3} fill="#107C10" />
+        <text x={108} y={height + 15}>
+          recommended
+        </text>
       </g>
     </svg>
   );

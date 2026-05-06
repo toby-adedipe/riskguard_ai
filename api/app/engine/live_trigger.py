@@ -55,7 +55,7 @@ from app.modules.risk.db import RiskScoreRepository
 
 logger = logging.getLogger(__name__)
 
-INCIDENT_ID = "INC-2025-IKEJA-001"
+INCIDENT_ID = "INC-2026-IKEJA-001"
 LGA_ID = "ikeja"
 CAUSE = "network outage"
 
@@ -363,6 +363,7 @@ def _run(
             metric, unit, mean, std = _DOMAIN_METRICS[domain]
             z = round(peak_z * progress, 2)
             value = round(mean + z * std, 3)
+            delta_pct = round((z * std / mean) * 100, 1) if mean != 0 else 0.0
             site = _BTS_SITES[(tick_idx + hash(domain)) % len(_BTS_SITES)]
             signals.append(
                 {
@@ -373,6 +374,7 @@ def _run(
                     "value": value,
                     "value_str": _fmt_value(domain, value),
                     "z_score": z,
+                    "delta_pct": delta_pct,
                 }
             )
         event_log.append(

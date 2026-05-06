@@ -53,7 +53,7 @@ class WakeConditionEvaluatorTestCase(unittest.TestCase):
             ),
         ]
         incident = Incident(
-            incident_id="INC-2025-IKEJA-001",
+            incident_id="INC-2026-IKEJA-001",
             lga_id="ikeja",
             cause="network outage",
             phase="active",

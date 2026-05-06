@@ -250,7 +250,10 @@ export interface LiveState {
 const TARGET_TICKS = 13;
 const TARGET_ROLES = 6;
 
-export const ROLE_COPY: Record<string, { label: string; mission: string; icon: LucideIcon }> = {
+export const ROLE_COPY: Record<
+  string,
+  { label: string; mission: string; icon: LucideIcon }
+> = {
   network_risk: {
     label: "Network Risk",
     mission: "Verify the network failure pattern across cells & BTS",
@@ -307,8 +310,9 @@ function metricLabel(metric: string): string {
 }
 
 function direction(z: number): string {
-  if (z >= 0) return `${z.toFixed(1)}σ above baseline`;
-  return `${Math.abs(z).toFixed(1)}σ below baseline`;
+  const absZ = Math.abs(z);
+  if (z >= 0) return `${absZ.toFixed(1)}x higher than normal`;
+  return `${absZ.toFixed(1)}x lower than normal`;
 }
 
 export function humanizeSignal(signal: TickSignal): string {
@@ -321,7 +325,10 @@ export function humanizeRoleStart(roleLabel: string): string {
   return `${roleLabel} agent dispatched — beginning investigation.`;
 }
 
-export function humanizeRoleComplete(roleLabel: string, synthesis?: string | null): string {
+export function humanizeRoleComplete(
+  roleLabel: string,
+  synthesis?: string | null,
+): string {
   if (synthesis && synthesis.trim().length > 0) {
     return `${roleLabel} agent finished: ${synthesis}`;
   }

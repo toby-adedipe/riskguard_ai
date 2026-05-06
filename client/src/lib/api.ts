@@ -141,18 +141,8 @@ export interface CompliancePack {
   evidenceLogs: string;
 }
 
-const lgaNames: Record<string, string> = {
-  ikeja: "Ikeja",
-  lekki: "Lekki",
-  surulere: "Surulere",
-  agege: "Agege",
-  alimosho: "Alimosho",
-  apapa: "Apapa",
-  eti_osa: "Eti-Osa",
-  ikorodu: "Ikorodu",
-  mushin: "Mushin",
-  oshodi: "Oshodi",
-};
+import { LGA_NAMES } from "./lgas";
+const lgaNames: Record<string, string> = LGA_NAMES;
 
 const fmtMoney = (value: number): string => {
   if (Number.isNaN(value)) {

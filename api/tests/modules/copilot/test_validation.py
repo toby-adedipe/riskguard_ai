@@ -11,7 +11,7 @@ class ClaimValidatorTestCase(unittest.TestCase):
         validator = ClaimValidator()
         response = AgentResponse(
             agent_role="network_risk",
-            incident_id="INC-2025-IKEJA-001",
+            incident_id="INC-2026-IKEJA-001",
             facts=[],
             inferences=[],
             recommendations=[],
@@ -26,7 +26,7 @@ class ClaimValidatorTestCase(unittest.TestCase):
         validator = ClaimValidator()
         response = AgentResponse(
             agent_role="revenue_assurance",
-            incident_id="INC-2025-IKEJA-001",
+            incident_id="INC-2026-IKEJA-001",
             facts=[
                 AgentFact(claim="Known fact", evidence_id="evd:known"),
                 AgentFact(claim="Unknown fact", evidence_id="evd:unknown"),

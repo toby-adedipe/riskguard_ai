@@ -27,7 +27,7 @@ class SimulationService:
         return status
 
     def trigger_ikeja(self) -> SimulationStatus:
-        incident_id = "INC-2025-IKEJA-001"
+        incident_id = "INC-2026-IKEJA-001"
         scenario_incident = self._scenario.incident_by_id(incident_id)
         if scenario_incident is not None:
             self._incident_repo.upsert(
@@ -70,7 +70,7 @@ class SimulationService:
             )
         )
 
-        status = SimulationStatus(mode="incident", incident_id="INC-2025-IKEJA-001")
+        status = SimulationStatus(mode="incident", incident_id="INC-2026-IKEJA-001")
         self._repo.set(status)
         return status
 

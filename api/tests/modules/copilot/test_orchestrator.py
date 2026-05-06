@@ -13,7 +13,7 @@ class MainInvestigationAgentTestCase(unittest.TestCase):
         agent, _ = build_seeded_agent()
         request = CopilotQueryRequest(
             role="network_risk",
-            incident_id="INC-2025-IKEJA-001",
+            incident_id="INC-2026-IKEJA-001",
             query="Why is Ikeja high risk?",
         )
 
@@ -31,7 +31,7 @@ class MainInvestigationAgentTestCase(unittest.TestCase):
         trigger = InvestigationTrigger(
             trigger_id="trigger-001",
             lga_id="ikeja",
-            incident_id="INC-2025-IKEJA-001",
+            incident_id="INC-2026-IKEJA-001",
             trigger_type="threshold",
             score=87.0,
             confidence=0.91,

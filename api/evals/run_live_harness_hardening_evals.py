@@ -141,7 +141,7 @@ def _check_bad_tool_call_case(case: dict) -> list[str]:
     registry = _build_registry()
     tool_call = case["toolCall"]
     try:
-        registry.call(tool_call["role"], tool_call["toolName"], "INC-2025-IKEJA-001", [])
+        registry.call(tool_call["role"], tool_call["toolName"], "INC-2026-IKEJA-001", [])
     except ValueError:
         return [] if case["expectation"]["shouldRaise"] else ["unexpected tool rejection"]
     return ["expected disallowed tool call to raise"]

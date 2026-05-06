@@ -128,7 +128,7 @@ def _with_social_media_signals(scenario: DemoScenario) -> DemoScenario:
     evidence = SignalEvidence(
         evidence_id=evidence_id,
         lga_id="ikeja",
-        incident_id="INC-2025-IKEJA-001",
+        incident_id="INC-2026-IKEJA-001",
         domain="social_media",
         kpi="social_posts_per_hr",
         current_value=186.0,

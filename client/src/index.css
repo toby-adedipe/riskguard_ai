@@ -2,23 +2,23 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", -apple-system, sans-serif;
-  --font-mono: 'ui-monospace', 'SFMono-Regular', monospace;
-  
-  --color-background: #F8FAFC;
-  --color-card: #FFFFFF;
-  --color-primary: #2563EB;
-  --color-danger: #DC2626;
-  --color-warning: #F59E0B;
-  --color-success: #16A34A;
-  --color-text-main: #0F172A;
-  --color-border-base: #E2E8F0;
+  --font-sans: "Segoe UI", "Inter", -apple-system, sans-serif;
+  --font-mono: 'Consolas', 'ui-monospace', 'SFMono-Regular', monospace;
 
-  /* Soft Variants from theme */
-  --color-danger-soft: #FEF2F2;
-  --color-warning-soft: #FFFBEB;
-  --color-success-soft: #F0FDF4;
-  --color-blue-soft: #EFF6FF;
+  --color-background: #F3F2F1;
+  --color-card: #FFFFFF;
+  --color-primary: #0078D4;
+  --color-danger: #D13438;
+  --color-warning: #FF8C00;
+  --color-success: #107C10;
+  --color-text-main: #323130;
+  --color-border-base: #D2D0CE;
+
+  /* Soft Variants */
+  --color-danger-soft: #FDF3F3;
+  --color-warning-soft: #FFF8F0;
+  --color-success-soft: #F1FAF1;
+  --color-blue-soft: #EFF6FC;
 }
 
 @layer base {
@@ -29,18 +29,18 @@
 
 @layer components {
   .panel-card {
-    @apply bg-card border border-border-base rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.05)] overflow-hidden;
+    @apply bg-card border border-border-base rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.02)] overflow-hidden;
   }
-  
+
   .data-value {
     @apply font-mono tracking-tighter;
   }
 
   .status-badge {
-    @apply px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border;
+    @apply px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider border;
   }
 
   .btn-secondary {
-    @apply px-3 py-1.5 text-xs font-semibold border border-border-base text-slate-600 rounded hover:bg-slate-50 transition-colors;
+    @apply px-3 py-1.5 text-xs font-semibold border border-border-base text-[#323130] rounded hover:bg-[#F3F2F1] transition-colors;
   }
 }

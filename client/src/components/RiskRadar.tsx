@@ -1,6 +1,4 @@
-import React from 'react';
-
-const RiskRadar: React.FC = () => {
+const RiskRadar = () => {
   const score = 87;
   const timeToBreach = 47;
   const confidence = 'High';

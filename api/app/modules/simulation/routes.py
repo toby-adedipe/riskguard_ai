@@ -48,7 +48,7 @@ def trigger_ikeja(
     Returns immediately with a session_id; the frontend then polls
     /simulation/events to render the live timeline.
     """
-    repo.set(SimulationStatus(mode="incident", incident_id="INC-2025-IKEJA-001"))
+    repo.set(SimulationStatus(mode="incident", incident_id="INC-2026-IKEJA-001"))
     session_id = start_live_trigger(
         risk_repo=risk_repo,
         incident_repo=incident_repo,
@@ -60,7 +60,7 @@ def trigger_ikeja(
     )
     return SimulationCommandResponse(
         ok=True,
-        status=SimulationStatus(mode="incident", incident_id="INC-2025-IKEJA-001"),
+        status=SimulationStatus(mode="incident", incident_id="INC-2026-IKEJA-001"),
         session_id=session_id,
     )
 
