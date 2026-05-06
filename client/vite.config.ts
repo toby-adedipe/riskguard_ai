@@ -17,6 +17,10 @@ export default defineConfig(({mode}) => {
     },
     server: {
       proxy: {
+        '/risk': {
+    target: 'http://127.0.0.1:8000', // Use the explicit IP instead of 'localhost'
+    changeOrigin: true,
+  },
         '/api': {
           target: 'http://127.0.0.1:8000',
           changeOrigin: true,
