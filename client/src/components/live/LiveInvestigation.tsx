@@ -20,10 +20,12 @@ import {
   Bot,
   Brain,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Download,
   Loader2,
   Radio,
+  RefreshCw,
   Send,
   Sparkles,
 } from "lucide-react";
@@ -66,6 +68,7 @@ interface LiveInvestigationProps {
   sessionId: string;
   incidentId: string | null;
   onDismiss: () => void;
+  onRedo: () => void;
 }
 
 const PHASE_COPY: Record<LiveState["phase"], { label: string; sub: string }> = {
@@ -93,13 +96,14 @@ export function LiveInvestigation({
   sessionId,
   incidentId,
   onDismiss,
+  onRedo,
 }: LiveInvestigationProps) {
-  const state = useLiveStream(sessionId);
+  const { state } = useLiveStream(sessionId);
   const progress = useDerivedRoleProgress(state);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-background">
-      <Header state={state} onDismiss={onDismiss} progress={progress} />
+      <Header state={state} onDismiss={onDismiss} progress={progress} onRedo={onRedo} />
 
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-4 px-6 py-4 overflow-hidden">
         <main className="col-span-12 lg:col-span-8 overflow-y-auto pr-1 space-y-4">
@@ -135,10 +139,12 @@ function Header({
   state,
   progress,
   onDismiss,
+  onRedo,
 }: {
   state: LiveState;
   progress: { total: number; done: number };
   onDismiss: () => void;
+  onRedo: () => void;
 }) {
   const phase = state.thresholdBlocked
     ? { label: "Monitoring complete", sub: "Agent threshold not reached" }
@@ -173,7 +179,7 @@ function Header({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <PhaseTimeline state={state} />
         <div className="flex items-center gap-2 px-3 py-1.5 bg-[#FAF9F8] border border-border-base rounded-md">
           <Activity size={12} className="text-[#605E5C]" />
@@ -181,6 +187,14 @@ function Header({
             {progress.done}/{progress.total} agents
           </span>
         </div>
+        <button
+          onClick={onRedo}
+          title="Replay investigation"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#605E5C] border border-border-base rounded-md hover:bg-background hover:text-text-main transition-colors"
+        >
+          <RefreshCw size={12} />
+          Redo
+        </button>
       </div>
     </header>
   );
@@ -488,6 +502,22 @@ function AgentSidePanel({
   state: LiveState;
   incidentId: string | null;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const thread = useMemo(() => buildAgentThread(state), [state]);
+  const hasActivity = state.thoughts.length > 0 || state.roles.length > 0;
+
+  useEffect(() => {
+    if (hasActivity) setIsExpanded(true);
+  }, [hasActivity]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, [thread.length, state.roles.length]);
+
   return (
     <>
       <div className="px-5 py-4 border-b border-[#EDEBE9] flex items-center justify-between flex-none bg-[#FAF9F8]">
@@ -502,17 +532,44 @@ function AgentSidePanel({
             </p>
           </div>
         </div>
-        {state.phase === "investigating" && (
-          <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-soft border border-[#B3D7F2]">
-            <Loader2 size={10} className="animate-spin text-primary" />
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
-              Reasoning
+        <div className="flex items-center gap-2">
+          {state.phase === "investigating" && (
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-soft border border-[#B3D7F2]">
+              <Loader2 size={10} className="animate-spin text-primary" />
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
+                Reasoning
+              </span>
             </span>
-          </span>
-        )}
+          )}
+          <button
+            onClick={() => setIsExpanded((v) => !v)}
+            className="p-1 rounded hover:bg-[#EDEBE9] transition-colors"
+            title={isExpanded ? "Collapse" : "Expand"}
+          >
+            <motion.div
+              animate={{ rotate: isExpanded ? 180 : 0 }}
+              transition={{ duration: 0.22 }}
+            >
+              <ChevronDown size={14} className="text-[#605E5C]" />
+            </motion.div>
+          </button>
+        </div>
       </div>
 
-      <AgentTimeline state={state} />
+      <motion.div
+        ref={scrollRef}
+        animate={{
+          maxHeight: isExpanded ? 9999 : 0,
+          opacity: isExpanded ? 1 : 0,
+        }}
+        initial={false}
+        transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
+        className="flex-1 min-h-0"
+        style={{ overflowY: "auto", overflowX: "hidden" }}
+      >
+        <AgentTimeline state={state} />
+      </motion.div>
+
       <CopilotChat state={state} incidentId={incidentId} />
     </>
   );
@@ -520,23 +577,12 @@ function AgentSidePanel({
 
 function AgentTimeline({ state }: { state: LiveState }) {
   const thread = useMemo(() => buildAgentThread(state), [state]);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    });
-  }, [thread.length, state.roles]);
 
   const showWaiting = thread.length === 0 && state.phase === "telemetry";
   const showActivating = thread.length === 0 && state.phase === "wake";
 
   return (
-    <div
-      ref={scrollRef}
-      className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3"
-    >
+    <div className="px-4 py-4 space-y-3">
       {showWaiting && (
         <div className="p-4 border border-dashed border-border-base rounded-lg text-center text-[#605E5C] text-xs">
           Orchestrator dormant — will wake once the score crosses the
@@ -865,21 +911,31 @@ function CopilotChat({
         </div>
       )}
 
-      <form onSubmit={send} className="px-3 py-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <Bot size={13} className="text-[#605E5C]" />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            disabled={!enabled}
-            className="flex-1 text-[11px] border border-border-base rounded-sm px-2 py-1 bg-white outline-none focus:ring-1 focus:ring-primary disabled:opacity-60 text-text-main"
-          >
+      <form onSubmit={send} className="px-3 pt-2 pb-3 space-y-2">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Bot size={12} className="text-[#605E5C] flex-none" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-[#605E5C]">
+              Ask agent
+            </span>
+          </div>
+          <div className="flex gap-1 flex-wrap">
             {CHAT_ROLES.map((r) => (
-              <option key={r.id} value={r.id}>
-                Ask the {r.label} agent
-              </option>
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => setRole(r.id)}
+                disabled={!enabled}
+                className={`px-2 py-1 rounded text-[10px] font-semibold tracking-wide transition-colors disabled:opacity-50 ${
+                  role === r.id
+                    ? "bg-primary text-white"
+                    : "bg-[#EDEBE9] text-[#605E5C] hover:bg-border-base"
+                }`}
+              >
+                {r.label}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <input

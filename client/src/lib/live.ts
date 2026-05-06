@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Banknote,
   ClipboardCheck,
@@ -555,16 +555,60 @@ export function buildAgentThread(state: LiveState): AgentThreadItem[] {
   return items;
 }
 
-export function useLiveStream(sessionId: string | null) {
-  const [state, setState] = useState<LiveState>(() => initialState());
-  const lastEventIdRef = useRef(0);
+const STORAGE_PREFIX = "rg_live_";
+
+function storageKey(sid: string) {
+  return `${STORAGE_PREFIX}${sid}`;
+}
+
+function loadPersistedState(sessionId: string): LiveState | null {
+  try {
+    const raw = localStorage.getItem(storageKey(sessionId));
+    if (!raw) return null;
+    return JSON.parse(raw) as LiveState;
+  } catch {
+    return null;
+  }
+}
+
+function persistState(sessionId: string, state: LiveState) {
+  try {
+    localStorage.setItem(storageKey(sessionId), JSON.stringify(state));
+  } catch {
+    // quota exceeded — ignore
+  }
+}
+
+function clearPersistedState(sessionId: string) {
+  localStorage.removeItem(storageKey(sessionId));
+}
+
+export function useLiveStream(sessionId: string | null): {
+  state: LiveState;
+  reset: () => void;
+} {
+  const [version, setVersion] = useState(0);
+  const [state, setState] = useState<LiveState>(() => {
+    if (!sessionId) return initialState();
+    return loadPersistedState(sessionId) ?? initialState();
+  });
+  const lastEventIdRef = useRef(
+    sessionId ? (loadPersistedState(sessionId)?.maxAppliedId ?? 0) : 0,
+  );
   const stoppedRef = useRef(false);
+
+  const reset = useCallback(() => {
+    if (sessionId) clearPersistedState(sessionId);
+    setVersion((v) => v + 1);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
 
-    setState(initialState());
-    lastEventIdRef.current = 0;
+    const stored = version === 0 ? loadPersistedState(sessionId) : null;
+    const initState = stored ?? initialState();
+    setState(initState);
+    lastEventIdRef.current = stored?.maxAppliedId ?? 0;
     stoppedRef.current = false;
 
     let timer: number | null = null;
@@ -579,14 +623,17 @@ export function useLiveStream(sessionId: string | null) {
         );
 
         if (data.session_id !== sessionId) {
-          // Server moved on to a newer session — stop polling cleanly.
           stoppedRef.current = true;
           return;
         }
 
         if (data.events.length > 0) {
           lastEventIdRef.current = data.last_event_id;
-          setState((prev) => data.events.reduce(reduce, prev));
+          setState((prev) => {
+            const next = data.events.reduce(reduce, prev);
+            persistState(sessionId, next);
+            return next;
+          });
         }
 
         const lastType = data.events[data.events.length - 1]?.type;
@@ -594,8 +641,8 @@ export function useLiveStream(sessionId: string | null) {
           stoppedRef.current = true;
           return;
         }
-      } catch (err) {
-        // Silent; we'll retry on the next tick.
+      } catch {
+        // Silent; retry on next tick.
       }
       timer = window.setTimeout(poll, 350);
     };
@@ -606,9 +653,9 @@ export function useLiveStream(sessionId: string | null) {
       stoppedRef.current = true;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [sessionId]);
+  }, [sessionId, version]);
 
-  return state;
+  return { state, reset };
 }
 
 export function useDerivedRoleProgress(state: LiveState) {

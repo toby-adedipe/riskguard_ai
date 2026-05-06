@@ -32,13 +32,20 @@ interface SimulationCommandResponse {
 }
 
 function Shell() {
-  // LGA selection — Ikeja selected by default so the right panel is never empty
   const [selectedLgaId, setSelectedLgaId] = useState<string>(DEFAULT_LGA_ID);
-  // Whether the user has drilled into incident detail mode (from LGA summary CTA)
   const [showIncidentDetail, setShowIncidentDetail] = useState(false);
   const [activeTab, setActiveTab] = useState<"incident" | "compliance">("incident");
-  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
-  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(
+    () => localStorage.getItem("rg_incident_id"),
+  );
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(
+    () => localStorage.getItem("rg_session_id"),
+  );
+  // showLive is separate from liveSessionId so "Dashboard" just hides the view
+  // without destroying the session — returning resumes where we left off.
+  const [showLive, setShowLive] = useState<boolean>(
+    () => !!localStorage.getItem("rg_session_id"),
+  );
   const [agentThreshold, setAgentThreshold] = useState(65);
   const queryClient = useQueryClient();
 
@@ -51,31 +58,52 @@ function Shell() {
       queryClient.invalidateQueries({ queryKey: ["riskMap"] });
       const incidentId = response.data.status.incident_id ?? "INC-2025-IKEJA-001";
       setSelectedIncidentId(incidentId);
+      localStorage.setItem("rg_incident_id", incidentId);
       const sessionId = response.data.session_id;
-      if (sessionId) setLiveSessionId(sessionId);
+      if (sessionId) {
+        localStorage.setItem("rg_session_id", sessionId);
+        setLiveSessionId(sessionId);
+      }
+      setShowLive(true);
       setShowIncidentDetail(true);
     },
   });
 
   const handleSelectLGA = (lgaId: string) => {
     setSelectedLgaId(lgaId);
-    // Going back to summary mode when user picks a different LGA
     setShowIncidentDetail(false);
   };
 
   const handleViewIncident = () => {
-    // Ikeja is the only LGA with a live backend investigation
     if (selectedLgaId === "ikeja") {
-      triggerIkeja.mutate();
+      if (liveSessionId) {
+        // Resume the existing session instead of starting a new one
+        setShowLive(true);
+      } else {
+        triggerIkeja.mutate();
+      }
     } else {
-      // For other LGAs just show the operational panel without a live trigger
       setShowIncidentDetail(true);
     }
   };
 
+  // Just hide the live view — session stays alive so returning resumes it
   const handleDismissLive = () => {
-    setLiveSessionId(null);
+    setShowLive(false);
     setShowIncidentDetail(false);
+  };
+
+  // Clear everything and start a brand new investigation
+  const handleRedo = () => {
+    const oldSession = liveSessionId;
+    localStorage.removeItem("rg_session_id");
+    localStorage.removeItem("rg_incident_id");
+    if (oldSession) {
+      localStorage.removeItem(`rg_live_${oldSession}`);
+    }
+    setLiveSessionId(null);
+    setShowLive(false);
+    triggerIkeja.mutate();
   };
 
   return (
@@ -87,16 +115,18 @@ function Shell() {
           setSelectedIncidentId(id);
           if (id === null) {
             setLiveSessionId(null);
+            setShowLive(false);
             setShowIncidentDetail(false);
           }
         }}
       />
 
-      {liveSessionId ? (
+      {showLive && liveSessionId ? (
         <LiveInvestigation
           sessionId={liveSessionId}
           incidentId={selectedIncidentId}
           onDismiss={handleDismissLive}
+          onRedo={handleRedo}
         />
       ) : (
         <main className="flex-1 flex overflow-hidden">
