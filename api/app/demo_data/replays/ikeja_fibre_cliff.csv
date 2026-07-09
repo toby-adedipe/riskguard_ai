@@ -1,0 +1,17 @@
+timestamp,lga_id,domain,kpi,value,unit,cluster_id,sample_window_minutes
+2026-06-01T09:00:00Z,ikeja,network,cell_availability_pct,99.62,percent,ikeja-west,5
+2026-06-01T09:05:00Z,ikeja,network,cell_availability_pct,99.58,percent,ikeja-west,5
+2026-06-01T09:10:00Z,ikeja,network,cell_availability_pct,99.67,percent,ikeja-west,5
+2026-06-01T09:15:00Z,ikeja,network,cell_availability_pct,99.51,percent,ikeja-west,5
+2026-06-01T09:20:00Z,ikeja,network,cell_availability_pct,99.55,percent,ikeja-west,5
+2026-06-01T09:25:00Z,ikeja,network,cell_availability_pct,99.64,percent,ikeja-west,5
+2026-06-01T09:30:00Z,ikeja,network,cell_availability_pct,99.48,percent,ikeja-west,5
+2026-06-01T09:35:00Z,ikeja,network,cell_availability_pct,99.57,percent,ikeja-west,5
+2026-06-01T09:40:00Z,ikeja,network,cell_availability_pct,99.60,percent,ikeja-west,5
+2026-06-01T09:45:00Z,ikeja,network,cell_availability_pct,99.53,percent,ikeja-west,5
+2026-06-01T09:50:00Z,ikeja,network,cell_availability_pct,99.66,percent,ikeja-west,5
+2026-06-01T09:55:00Z,ikeja,network,cell_availability_pct,99.56,percent,ikeja-west,5
+2026-06-01T10:00:00Z,ikeja,network,cell_availability_pct,72.10,percent,ikeja-west,5
+2026-06-01T10:05:00Z,ikeja,network,cell_availability_pct,45.80,percent,ikeja-west,5
+2026-06-01T10:10:00Z,ikeja,network,cell_availability_pct,28.40,percent,ikeja-west,5
+2026-06-01T10:15:00Z,ikeja,network,cell_availability_pct,16.90,percent,ikeja-west,5

@@ -1,0 +1,17 @@
+timestamp,lga_id,domain,kpi,value,unit,cluster_id,sample_window_minutes
+2026-06-01T15:00:00Z,eti-osa,network,cell_availability_pct,99.44,percent,eti-osa-east,5
+2026-06-01T15:05:00Z,eti-osa,network,cell_availability_pct,99.61,percent,eti-osa-east,5
+2026-06-01T15:10:00Z,eti-osa,network,cell_availability_pct,99.38,percent,eti-osa-east,5
+2026-06-01T15:15:00Z,eti-osa,network,cell_availability_pct,99.72,percent,eti-osa-east,5
+2026-06-01T15:20:00Z,eti-osa,network,cell_availability_pct,99.49,percent,eti-osa-east,5
+2026-06-01T15:25:00Z,eti-osa,network,cell_availability_pct,99.57,percent,eti-osa-east,5
+2026-06-01T15:30:00Z,eti-osa,network,cell_availability_pct,99.33,percent,eti-osa-east,5
+2026-06-01T15:35:00Z,eti-osa,network,cell_availability_pct,99.68,percent,eti-osa-east,5
+2026-06-01T15:40:00Z,eti-osa,network,cell_availability_pct,99.52,percent,eti-osa-east,5
+2026-06-01T15:45:00Z,eti-osa,network,cell_availability_pct,99.46,percent,eti-osa-east,5
+2026-06-01T15:50:00Z,eti-osa,network,cell_availability_pct,99.63,percent,eti-osa-east,5
+2026-06-01T15:55:00Z,eti-osa,network,cell_availability_pct,99.41,percent,eti-osa-east,5
+2026-06-01T16:00:00Z,eti-osa,network,cell_availability_pct,99.59,percent,eti-osa-east,5
+2026-06-01T16:05:00Z,eti-osa,network,cell_availability_pct,99.36,percent,eti-osa-east,5
+2026-06-01T16:10:00Z,eti-osa,network,cell_availability_pct,99.66,percent,eti-osa-east,5
+2026-06-01T16:15:00Z,eti-osa,network,cell_availability_pct,99.50,percent,eti-osa-east,5

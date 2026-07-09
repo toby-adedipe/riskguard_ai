@@ -7,6 +7,10 @@ fixture-backed agent envelopes and provider response extraction. It is not an
 interactive agent runtime. `GET /copilot/status` exposes that boundary and
 `POST /copilot/query` returns `503` until a production runtime is implemented.
 
+Phase 0A also provides synchronous CSV/JSONL replay ingestion. It derives
+polarity-aware median/MAD evidence and risk scores, but deliberately does not
+open incidents or invoke agents.
+
 ## Layout
 
 ```
@@ -21,8 +25,11 @@ api/
     ├── core/
     │   ├── config.py          # Settings via pydantic-settings
     │   └── schemas.py         # cross-domain Pydantic shapes
+    ├── engine/                framework-free features + risk scoring
     └── modules/
         ├── simulation/        routes.py services.py db.py schemas.py
+        ├── ingestion/         replay adapter + application/API boundary
+        ├── evidence/          stable evidence repository
         ├── risk/              ...
         ├── incidents/         ...
         ├── copilot/           ...
@@ -76,6 +83,18 @@ To test strict structured output against OpenRouter, set
 `OPENROUTER_API_KEY` in `.env` and add `--live-openrouter-strict`. This still
 tests provider and extraction conformance only; it is not a model-driven tool
 loop or an interactive agent runtime.
+
+## Run a telemetry replay
+
+`POST /ingestion/replay` accepts a JSON body containing `format` (`csv` or
+`jsonl`), the file `content`, an optional source-to-canonical
+`column_mapping`, and a `source_name`. The synchronous response contains the
+derived scores and stable evidence ids. `GET /ingestion/status` returns the
+latest run, or accepts a `run_id` query parameter.
+
+The exact field contract and mapping examples are in
+[`docs/INGESTION_FORMAT.md`](../docs/INGESTION_FORMAT.md). This endpoint is a
+local replay boundary, not a live feed or background job.
 
 You can also drop into the venv shell first and run `uvicorn` directly:
 

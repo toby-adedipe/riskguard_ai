@@ -2,9 +2,11 @@
 
 _Part of the demo→product bundle. This is the layer that decides, unprompted, that an incident is happening. It is deterministic, explainable, and LLM-free by design — the agents (layer 4) reason **about** what this layer detects; they never detect. See [`AGENT_PRODUCT_PLAN.md`](AGENT_PRODUCT_PLAN.md) §2 and [`PHASE0_REPLAY_AUTONOMY_SPEC.md`](PHASE0_REPLAY_AUTONOMY_SPEC.md) (which scaffolds a simpler version this supersedes at Phase 1)._
 
-> **Status (2026-07-09): not implemented.** The previous fixed Ikeja
-> trajectories and flat mean/stddev demo engine were removed from `dev` so new
-> work can implement this contract without inheriting theatrical behavior.
+> **Status (2026-07-09): Phase 0A foundation implemented.** Canonical replay,
+> prior-sample median/MAD fallback, KPI polarity, stable evidence, and
+> transparent LGA risk aggregation are real. Seasonal baselines, gap/skew
+> handling, shape classification, spatial correlation, time-to-breach, and the
+> incident lifecycle below remain to be implemented.
 
 ## 0. What "as real as possible" means here
 

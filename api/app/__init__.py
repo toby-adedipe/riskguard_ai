@@ -9,6 +9,7 @@ from app.modules.actions.routes import router as actions_router
 from app.modules.compliance.routes import router as compliance_router
 from app.modules.copilot.routes import router as copilot_router
 from app.modules.incidents.routes import router as incidents_router
+from app.modules.ingestion.routes import router as ingestion_router
 from app.modules.risk.routes import router as risk_router
 from app.modules.risk.db import get_risk_repo
 from app.modules.incidents.db import get_incident_repo
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(simulation_router)
+    app.include_router(ingestion_router)
     app.include_router(risk_router)
     app.include_router(incidents_router)
     app.include_router(copilot_router)

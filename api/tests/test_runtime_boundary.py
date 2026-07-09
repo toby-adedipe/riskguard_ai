@@ -13,6 +13,8 @@ class RuntimeBoundaryTest(unittest.TestCase):
 
         self.assertIn("/copilot/status", paths)
         self.assertIn("/copilot/query", paths)
+        self.assertIn("/ingestion/replay", paths)
+        self.assertIn("/ingestion/status", paths)
         self.assertNotIn("/copilot/investigate", paths)
         self.assertNotIn("/simulation/events", paths)
         self.assertNotIn("/simulation/mitigate", paths)

@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 Severity = Literal["green", "amber", "red"]
 SeverityHint = Literal["low", "medium", "high", "critical"]
 IncidentPhase = Literal["active", "mitigating", "recovery", "resolved"]
+BaselineMethod = Literal["provided_baseline", "global_median_mad"]
+AnomalyShape = Literal["cliff", "decay", "swell", "spike", "flap", "unknown"]
 SignalDomain = Literal[
     "network",
     "bts",
@@ -91,7 +93,7 @@ class SignalDimensions(BaseModel):
 
 
 class SignalEvent(BaseModel):
-    """Canonical synthetic stream record shared across all telecom domains."""
+    """Canonical telemetry record shared across all telecom domains."""
 
     event_id: str
     lga_id: str
@@ -123,6 +125,10 @@ class FeatureWindow(BaseModel):
     rolling_mean: float
     rolling_stddev: float
     z_score: float
+    expected_value: float | None = None
+    dispersion: float | None = Field(default=None, ge=0)
+    baseline_method: BaselineMethod | None = None
+    harmful_z_score: float | None = Field(default=None, ge=0)
     delta_pct: float
     anomaly_score: float = Field(ge=0, le=1)
     sample_count: int = Field(ge=1)
@@ -142,6 +148,12 @@ class SignalEvidence(BaseModel):
     current_value: float
     baseline_value: float | None = None
     delta_pct: float | None = None
+    z_score: float | None = None
+    expected_value: float | None = None
+    dispersion: float | None = Field(default=None, ge=0)
+    baseline_method: BaselineMethod | None = None
+    harmful_z_score: float | None = Field(default=None, ge=0)
+    anomaly_shape: AnomalyShape | None = None
     anomaly_score: float | None = Field(default=None, ge=0, le=1)
     severity_hint: SeverityHint | None = None
     summary: str

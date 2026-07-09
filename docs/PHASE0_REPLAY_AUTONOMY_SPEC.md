@@ -63,9 +63,14 @@ app/engine/
   config.py       # window size, severity thresholds, Z_MAX, breach line
 ```
 
-**`features.py`** — maintain a rolling window (deque of last `N` samples, default N=30) per `(lga_id, kpi)`. On each `SignalEvent`:
-- `rolling_mean`, `rolling_stddev` over the window; `z = (value - mean) / max(stddev, eps)`.
-- `delta_pct` from `baseline_value` if present, else vs `rolling_mean`.
+**`features.py`** — maintain a rolling window (deque of prior samples, default
+N=30) per `(lga_id, kpi)`. Phase 0A implements the global fallback from the
+Layer-3 spec rather than recreating the deleted flat mean/stddev detector:
+- expected value = prior-sample median; dispersion = MAD with configured
+  absolute and relative floors;
+  before the minimum sample count, use `baseline_value` when the source
+  provides it and label the method `provided_baseline`.
+- `delta_pct` from the selected expected value.
 - Apply polarity: anomaly only in the harmful direction (availability/success ↓ is bad; drop-call/failure/congestion/complaints ↑ is bad).
 - `anomaly_score = min(1.0, abs(z) / Z_MAX)` (Z_MAX≈6), zeroed if the deviation is in the benign direction.
 - Emit a `FeatureWindow` and a `SignalEvidence` (carry `evidence_id` from the event; `summary` = human line like "cell availability 71% vs 99% baseline (z=-5.2)"). Persist evidence (see 3.3).
@@ -120,8 +125,9 @@ Replay may run synchronously (fast, bounded file) or paced (sleep between timest
 Add `app/modules/evidence/db.py` with `EvidenceRepository` (singleton, `add`/`get`/`list_for_lga`) so agent facts can resolve `evidence_id`. `SignalEvidence` already exists in `core/schemas.py`.
 
 ### 3.4 Endpoints
-- `POST /ingestion/replay` — body `{fixture: "ikeja_fibre_cut"}` or an uploaded file; starts a run, returns run id.
-- `GET /ingestion/status` — `{state, events_processed, incidents_opened}`.
+- `POST /ingestion/replay` — body `{format, content, column_mapping?, source_name?}`; synchronously runs canonical CSV/JSONL content and returns its result.
+- `GET /ingestion/status` — latest or selected completed-run summary, including
+  counts, stable evidence ids, derived scores, limitations, and completion time.
 Wire both routers in `app/__init__.py` (alongside the existing `include_router` calls).
 
 ## 4. Deliverable B — machine-initiated grounded analysis
@@ -176,27 +182,47 @@ Document this in `app/modules/ingestion/mapping.py` and a short `docs/INGESTION_
 **Reuse, don't touch:** `core/schemas.py` contracts; existing `risk`/`incidents` repo singletons; existing `/risk/map` and `/incidents/{id}` endpoints.
 **Do not:** put risk math in `app/modules/*/routes.py`; hard-import copilot from ingestion; add a `utils`/`common` catch-all; introduce ML libs (Isolation Forest/SHAP) or SK/Azure/LLM; add auth, a real DB, or websockets. All explicitly deferred (YAGNI / Phase 1+).
 
-## 8. Task breakdown (ordered, assignable)
-0. Run `scan_architecture.py --mode pre` (done — baseline captured).
-1. `engine/polarity.py` + `engine/config.py` + unit tests for polarity.
-2. `engine/features.py` (rolling window → FeatureWindow + SignalEvidence) + tests.
-3. `engine/scoring.py` (LGA score, severity, ttb) + tests.
-4. `evidence` repo; wire features to persist evidence.
-5. `engine/impact.py` + `engine/classify.py` + `lga_profile.json` + tests (numbers derive from inputs).
-6. `ingestion` module: `source.py`, `replay.py`, `mapping.py`, `service.py`, `db.py`, `routes.py`, `schemas.py`; wire router.
-7. `core/events.py`; emit `IncidentOpened` from ingestion.
-8. `copilot/orchestrator.py` + claim validator + `AgentRunRepository`; subscribe in `create_app()`.
-9. `GET /incidents/{id}/analysis`; keep `/copilot/query`.
-10. Two fixtures; end-to-end run of each.
-11. Frontend (separate track): replace "Trigger Ikeja" with "Start replay"; poll `/incidents/{id}/analysis`; render the auto-conclusion.
-12. Run `scan_architecture.py --mode post`; review the diff against this plan.
+## 8. Phase 0A task breakdown (current slice)
+0. Run `scan_architecture.py --mode pre` and preserve the clean boundary.
+1. Add robust-baseline metadata to `FeatureWindow` and `SignalEvidence` without
+   breaking the retained presentation fixture.
+2. Implement `engine/config.py`, `polarity.py`, `features.py`, and `scoring.py`.
+3. Implement the `evidence` repository.
+4. Implement canonical CSV/JSONL replay parsing, mapping, synchronous service,
+   status repository, and API routes.
+5. Add cross-LGA replay fixtures plus a normal/noisy control.
+6. Wire only the ingestion router; do not alter simulation, incidents, or
+   copilot.
+7. Run focused and full tests plus the post architecture scan.
 
-## 9. Definition of done
-- `POST /ingestion/replay {fixture: "ikeja_fibre_cut"}` → `/risk/map` shows a derived red score for Ikeja; `/incidents/{id}` returns computed impact.
-- Running `surulere_congestion` instead yields a **different** LGA, cause, and exposure — proving no hardcoding.
-- Within the same run, `GET /incidents/{id}/analysis` returns non-empty `AgentResponse`s that were produced **without any `/copilot/query` call**, and **every `fact.evidence_id` resolves** in `EvidenceRepository`; a fabricated-claim unit test is rejected by the validator.
-- `engine/` imports no FastAPI; ingestion imports no copilot.
-- `pre`/`post` architecture scans reviewed; no new large-file or catch-all smells.
+## 9. Phase 0A definition of done
+- Two different replay inputs produce different LGA scores and evidence from
+  their values; no engine or ingestion module imports the demo fixture or a
+  hardcoded score.
+- A normal/noisy control stays green and produces no anomalous evidence.
+- Harmful-direction deviations score; equivalent benign-direction deviations
+  do not.
+- Every emitted evidence id is stable and resolves through
+  `EvidenceRepository`.
+- `/risk/map` exposes replay-derived scores for touched LGAs while the explicit
+  `/simulation/*` presentation path remains separate.
+- `engine/` imports no FastAPI, repositories, or copilot; ingestion imports no
+  copilot.
+- Incidents, `IncidentOpened`, analysis responses, agents, NCC classification,
+  frontend replay controls, live feeds, auth, and durable persistence remain
+  explicitly out of scope.
 
-## 10. Why this is the right first build
-It is pipeline-independent: it upgrades the demo for MTN *and* makes "send us one incident export" a real, near-zero-integration offer for Airtel, IHS, a DisCo, or a bank — the Ring-1 pipeline from the roadmap. It attacks the two cheapest high-leverage gaps (replay, real classification) and the highest-narrative one (autonomy), and it defers the expensive moat (real detection ML) to Phase 1 without blocking the sales motion.
+## 10. Dependency order after Phase 0A
+
+```text
+replay → trusted evidence + risk
+  → correlation / incident lifecycle / IncidentOpened
+  → repository-backed W1 tools
+  → one budgeted specialist model↔tool loop
+  → event wake-up
+  → multi-agent orchestration
+```
+
+This order upgrades the customer-data path without creating another agent
+runtime over fixture observations. It also gives every later agent fact a real,
+queryable grounding source.

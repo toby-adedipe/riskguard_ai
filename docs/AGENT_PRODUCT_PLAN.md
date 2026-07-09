@@ -5,10 +5,11 @@ _Self-contained handoff document. A fresh engineering thread should be able to b
 > **Implementation status (2026-07-09):** this is the north-star product plan.
 > The codebase currently contains a W0 OpenRouter strict-output conformance
 > spike (prompt composition, fixture observations, extraction, validation, and
-> transcript persistence). It does **not** run pi, a model-to-tool loop,
-> event-driven orchestration, or multiple agents. The earlier fixed Semantic
-> Kernel playbook was intentionally removed rather than treated as progress
-> toward this design.
+> transcript persistence), plus a Phase 0A replay path that derives robust
+> evidence and risk from canonical telemetry. It does **not** run pi, a
+> model-to-tool loop, incident events, event-driven orchestration, or multiple
+> agents. The earlier fixed Semantic Kernel playbook was intentionally removed
+> rather than treated as progress toward this design.
 
 **Read order for the implementing thread:**
 1. This document (the plan) — layer 4 (agents) + the whole-system spine.

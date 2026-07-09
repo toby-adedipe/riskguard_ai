@@ -3,11 +3,13 @@
 RiskGuard AI is an early-warning and decision-support product for operational telecom risk. The target product detects an emerging incident, investigates it with grounded agents, lets an operator approve mitigation, and produces an NCC-ready evidence pack.
 
 The current `dev` branch is deliberately earlier than that target. It contains
-the frontend presentation fixture and the W0 strict-output agent conformance
-spike, but no interactive agent runtime or production detection engine. The
-copilot endpoint fails closed with `503`; the UI labels the runtime offline.
-The layer specifications in `docs/` are the implementation north star, not a
-claim that those layers already exist.
+the frontend presentation fixture, the W0 strict-output agent conformance
+spike, and a Phase 0A replay path that derives robust evidence and LGA risk
+from canonical CSV/JSONL telemetry. It still has no interactive agent runtime,
+incident correlation/lifecycle, or production seasonal detector. The copilot
+endpoint fails closed with `503`; the UI labels the runtime offline. The layer
+specifications in `docs/` are the implementation north star, not a claim that
+those layers already exist.
 
 Start with [`docs/AGENT_PRODUCT_PLAN.md`](docs/AGENT_PRODUCT_PLAN.md), then read
 the detection, replay/autonomy, delivery, and rulepack specifications in
