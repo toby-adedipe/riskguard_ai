@@ -1,9 +1,11 @@
 __pycache__/
 *.pyc
+.DS_Store
 .venv/
 .env
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.agent_transcripts/
 *.sqlite
 *.db

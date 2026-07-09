@@ -1,0 +1,177 @@
+# RiskGuard rulepack — Nigerian Communications Commission (telecom)
+# Layer 5. Loaded by get_rulepack / classify_against_rulepack.
+# READ docs/rulepacks/README.md first, especially the honesty rule.
+#
+# verification_status legend:
+#   confirmed   - traceable to a primary NCC document (NONE are marked confirmed yet;
+#                 the team must obtain the primary texts and upgrade these)
+#   reported    - from credible secondary reporting (NCC press releases / national press, 2025-2026)
+#   assumption  - modeling placeholder we invented; MUST be replaced before any real filing
+
+meta:
+  regulator: "Nigerian Communications Commission (NCC)"
+  sector: "telecom"
+  jurisdiction: "Nigeria"
+  version: "0.1.0-draft"
+  effective_date: "2025-11-01"   # QoS/compensation enforcement reported to begin Nov 2025 [reported]
+  sources:
+    - "NCC press release: mandate for service providers to inform consumers of major outages; Uptime portal [reported]"
+    - "National press (Punch/BusinessDay/Leadership/Technext) 2025-2026 on QoS enforcement & consumer compensation [reported]"
+    - "PRIMARY DOCUMENTS TO OBTAIN: NCC Guidelines on Major/Significant Network Outages; QoS Business Rules/Regulations; Consumer Code — needed to upgrade values to 'confirmed'"
+
+# ---------------------------------------------------------------------------
+# CLASSIFICATION — is this a 'major outage' under NCC rules?
+# Evaluated in order; an incident is 'major' if ANY limb matches.
+# ---------------------------------------------------------------------------
+classification:
+  severity_tiers: ["minor", "reportable", "major"]
+  rules:
+    - id: "major.subscriber_or_lga_reach"
+      description: >
+        Network condition (e.g. fibre cut, theft/vandalism, force majeure) impacting a
+        significant share of subscribers or spanning multiple LGAs.
+      predicate:
+        any:
+          - "affected_subscriber_fraction >= 0.05"    # >= 5% of the operator's subscriber base
+          - "affected_lgas >= 5"
+      severity_tier: "major"
+      citation: "NCC major-outage definition, limb (a) [reported]"
+      verification_status: "reported"
+
+    - id: "major.site_scale_duration"
+      description: >
+        Unplanned outage or complete isolation of a large number of sites, or a whole cluster,
+        sustained beyond a short threshold.
+      predicate:
+        all:
+          - any:
+              - "affected_sites >= 100"
+              - "affected_sites >= 0.05 * total_sites"   # whichever is less, per reporting
+              - "affected_clusters >= 1"
+          - "duration_minutes >= 30"
+      severity_tier: "major"
+      citation: "NCC major-outage definition, limb (b) [reported]"
+      verification_status: "reported"
+
+    - id: "major.top_traffic_state_degradation"
+      description: >
+        Any outage degrading network quality in the top-10 states by traffic volume,
+        as specified by the Commission from time to time.
+      predicate:
+        all:
+          - "state in top_traffic_states"     # top_traffic_states is a Commission-published list [assumption: list not encoded yet]
+          - "quality_degraded == true"
+      severity_tier: "major"
+      citation: "NCC major-outage definition, limb (c) [reported]"
+      verification_status: "reported"
+
+    - id: "reportable.default"
+      description: "Incident that is service-affecting but does not meet a major-outage limb."
+      predicate: { all: ["service_affecting == true"] }
+      severity_tier: "reportable"
+      citation: "n/a"
+      verification_status: "assumption"
+
+# ---------------------------------------------------------------------------
+# REPORTING & NOTIFICATION obligations triggered by classification.
+# Deadlines below are ASSUMPTIONS pending the primary text — do not file against them.
+# ---------------------------------------------------------------------------
+reporting:
+  obligations:
+    - id: "consumer_notice.major_unplanned"
+      trigger: "severity_tier == 'major'"
+      audience: "affected consumers"
+      channel: ["operator media channels", "NCC Uptime portal"]
+      deadline: "promptly upon confirmation"        # [assumption] exact window pending primary text
+      content_required:
+        - "cause(s) of the interruption"
+        - "area(s) affected"
+        - "estimated time to restore service"
+      citation: "NCC directive to inform consumers of major outages [reported]"
+      verification_status: "reported"     # obligation reported; precise deadline is assumption
+
+    - id: "consumer_notice.planned"
+      trigger: "planned_outage == true"
+      audience: "affected consumers"
+      channel: ["operator media channels"]
+      deadline: "at least 7 days in advance"        # 1-week advance for planned outages [reported]
+      content_required: ["area(s) affected", "planned window", "expected impact"]
+      citation: "NCC advance-notice requirement for planned outages [reported]"
+      verification_status: "reported"
+
+    - id: "regulator_report.major"
+      trigger: "severity_tier == 'major'"
+      audience: "NCC"
+      channel: ["NCC Uptime portal"]
+      deadline: "per Uptime portal requirements"    # [assumption] confirm cadence/latency
+      content_required: ["incident record", "impact statistics", "restoration status", "RCA (follow-up)"]
+      citation: "NCC Uptime outage-reporting portal [reported]"
+      verification_status: "reported"
+
+# ---------------------------------------------------------------------------
+# EXPOSURE — consumer-compensation model (QoS breach regime, reported from Nov 2025).
+# The FORMULA SHAPE is reported (airtime credit ~ ARPU x LGA presence); ALL NUMBERS are assumptions.
+# ---------------------------------------------------------------------------
+exposure:
+  formulas:
+    - id: "consumer_compensation.airtime_credit"
+      applies_when: "severity_tier in ['major','reportable'] and qos_breach == true"
+      description: >
+        Airtime credit to affected subscribers, computed from their average spend and their
+        presence in the LGA(s) where service failed.
+      formula: "compensation_ngn = affected_subscribers * avg_daily_spend_ngn * credit_days * eligibility_factor"
+      parameters:
+        avg_daily_spend_ngn: { value: "from lga_profile ARPU", verification_status: "confirmed_input" }
+        credit_days: { value: 1, verification_status: "assumption" }          # placeholder
+        eligibility_factor: { value: 1.0, verification_status: "assumption" }  # share of affected who qualify
+      output_currency: "NGN"
+      citation: "NCC consumer-compensation directive, airtime-credit basis [reported]"
+      verification_status: "assumption"   # numbers must be replaced from the primary determination
+
+    - id: "revenue_at_risk.operator"
+      applies_when: "always"
+      description: "Operator's own revenue exposure during the outage window (internal, not a regulatory penalty)."
+      formula: "revenue_at_risk_ngn = affected_subscribers * arpu_daily_ngn * (duration_minutes / 1440)"
+      parameters:
+        arpu_daily_ngn: { value: "from lga_profile", verification_status: "confirmed_input" }
+      output_currency: "NGN"
+      citation: "internal model (not a regulatory figure)"
+      verification_status: "assumption"
+
+# ---------------------------------------------------------------------------
+# EVIDENCE PACK — the NCC-facing artifact. Maps to compliance NCCPack schema.
+# ---------------------------------------------------------------------------
+evidence_pack:
+  required_sections:
+    - { key: "timeline",           source: "incident record + audit trail + validated agent notes" }
+    - { key: "affected_services",  source: "detection blast radius + topology" }
+    - { key: "kpis",               source: "FeatureWindow / SignalEvidence at incident peak" }
+    - { key: "impacted_subscribers", source: "impact-exposure agent (validated)" }
+    - { key: "root_cause",         source: "network-forensics agent (validated, hedged)" }
+    - { key: "corrective_actions", source: "approved mitigations from audit trail" }
+    - { key: "evidence_logs",      source: "evidence store ids + tool-call trace" }
+  format: ["PDF (human)", "structured JSON (portal payload)"]
+  signing: "content hash + timestamp; records rulepack version used"   # non-repudiation
+
+# ---------------------------------------------------------------------------
+consumer_notice:
+  when_required: "severity_tier == 'major' or planned_outage == true"
+  required_fields: ["cause (hedged to evidence)", "affected areas", "expected restoration time or 'to be advised'"]
+  prohibited_content:
+    - "admissions of liability beyond disclosure requirements"
+    - "restoration promises not backed by a grounded estimate"
+    - "technical jargon; personal subscriber data"
+  channel: ["SMS/USSD broadcast to affected cells", "operator website/social", "NCC Uptime portal"]
+  deadline: "aligned to reporting.consumer_notice.* obligation"
+
+# ---------------------------------------------------------------------------
+# VERIFICATION CHECKLIST — clear ALL of these before any real NCC filing.
+# ---------------------------------------------------------------------------
+verification:
+  required_before_production:
+    - "Obtain NCC primary texts (major-outage guidelines, QoS business rules, consumer code) and upgrade every 'reported' value to 'confirmed' with clause citations."
+    - "Confirm the exact major-outage thresholds and the 'whichever is less' site rule wording."
+    - "Encode the Commission's current top-10-traffic-states list and its update cadence."
+    - "Replace ALL compensation parameters (credit_days, eligibility_factor, breach criteria) with the published determination."
+    - "Confirm consumer-notice and regulator-report deadlines (the assumptions above are NOT legal deadlines)."
+    - "Confirm Uptime portal submission format and cadence."

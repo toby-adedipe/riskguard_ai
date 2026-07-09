@@ -1,0 +1,120 @@
+{
+  "scenario_id": "scenario-001-ikeja-fibre-cut",
+  "now_utc": "2026-07-08T11:25:00+00:00",
+  "brief": "Determine the most probable cause of the availability degradation in INC-2026-IKEJA-001; distinguish transport, power, congestion, equipment, and cyber signatures.",
+  "incident": {
+    "incident_id": "INC-2026-IKEJA-001",
+    "lga_id": "IKEJA",
+    "cause": "under investigation",
+    "phase": "active",
+    "opened_at": "2026-07-08T10:42:00+00:00",
+    "impact": {
+      "affected_subscribers": 18420,
+      "enterprise_lines": 312,
+      "revenue_at_risk_ngn": 121880.0,
+      "compensation_exposure_ngn": 2099880.0,
+      "ncc_exposure_summary": "Derived from Ikeja profile and current availability degradation."
+    }
+  },
+  "evidence": [
+    {
+      "evidence_id": "EV-IKEJA-NET-001",
+      "lga_id": "IKEJA",
+      "incident_id": "INC-2026-IKEJA-001",
+      "domain": "network",
+      "kpi": "cell_availability_pct",
+      "current_value": 71.4,
+      "baseline_value": 99.1,
+      "delta_pct": -27.9,
+      "anomaly_score": 0.94,
+      "severity_hint": "critical",
+      "summary": "cell_availability_pct fell from 99.1 to 71.4 in Ikeja cluster IKJ-CL-04.",
+      "source_system": "fixture-replay",
+      "timestamp": "2026-07-08T10:42:00+00:00",
+      "related_event_ids": ["EVT-IKEJA-NET-001"],
+      "dimensions": {
+        "cluster_id": "IKJ-CL-04"
+      }
+    },
+    {
+      "evidence_id": "EV-IKEJA-DEVICE-001",
+      "lga_id": "IKEJA",
+      "incident_id": "INC-2026-IKEJA-001",
+      "domain": "device_sessions",
+      "kpi": "session_failure_rate_pct",
+      "current_value": 18.2,
+      "baseline_value": 1.1,
+      "delta_pct": 1554.5,
+      "anomaly_score": 0.91,
+      "severity_hint": "critical",
+      "summary": "session_failure_rate_pct rose from 1.1 to 18.2 after the availability drop.",
+      "source_system": "fixture-replay",
+      "timestamp": "2026-07-08T10:47:00+00:00",
+      "related_event_ids": ["EVT-IKEJA-DEVICE-001"],
+      "dimensions": {
+        "cluster_id": "IKJ-CL-04"
+      }
+    },
+    {
+      "evidence_id": "EV-IKEJA-CONG-001",
+      "lga_id": "IKEJA",
+      "incident_id": "INC-2026-IKEJA-001",
+      "domain": "network",
+      "kpi": "congestion_rate_pct",
+      "current_value": 11.8,
+      "baseline_value": 4.1,
+      "delta_pct": 187.8,
+      "anomaly_score": 0.76,
+      "severity_hint": "high",
+      "summary": "congestion_rate_pct rose from 4.1 to 11.8 on neighboring clusters as traffic rerouted.",
+      "source_system": "fixture-replay",
+      "timestamp": "2026-07-08T10:54:00+00:00",
+      "related_event_ids": ["EVT-IKEJA-CONG-001"],
+      "dimensions": {
+        "cluster_id": "IKJ-CL-05"
+      }
+    }
+  ],
+  "agent_final_output": {
+    "agent_role": "network_forensics",
+    "incident_id": "INC-2026-IKEJA-001",
+    "narrative": "Ikeja shows a sharp cell availability drop followed by device-session failures and congestion on neighboring clusters. The pattern is most consistent with transport degradation on the IKJ-CL-04 corridor, with reroute congestion as a cascade. Confidence is high enough to brief mitigation, but field confirmation is still needed before naming a physical cable fault.",
+    "facts": [
+      {
+        "claim": "cell_availability_pct fell from 99.1 to 71.4 in Ikeja",
+        "evidence_id": "EV-IKEJA-NET-001"
+      },
+      {
+        "claim": "session_failure_rate_pct rose from 1.1 to 18.2 after the availability drop",
+        "evidence_id": "EV-IKEJA-DEVICE-001"
+      },
+      {
+        "claim": "congestion_rate_pct rose from 4.1 to 11.8 on neighboring clusters",
+        "evidence_id": "EV-IKEJA-CONG-001"
+      }
+    ],
+    "inferences": [
+      {
+        "claim": "pattern consistent with backbone transport degradation with reroute congestion as a cascade",
+        "confidence": 0.82
+      }
+    ],
+    "recommendations": [
+      {
+        "action": "review reversible reroute options for human approval",
+        "requires_approval": true
+      }
+    ],
+    "open_questions": [
+      "field confirmation is unavailable for the IKJ-CL-04 corridor",
+      "power-domain evidence for the affected cluster has not been provided"
+    ],
+    "assumptions": [
+      "fixture evidence is the complete scenario-001 evidence set"
+    ],
+    "tools_called": [
+      "get_incident_context",
+      "list_evidence"
+    ]
+  }
+}
