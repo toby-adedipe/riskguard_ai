@@ -1,5 +1,10 @@
 # MVP Engineering Domains
 
+> **Historical team-ownership map.** This describes the one-week hackathon
+> split and the retired deterministic/Semantic Kernel path. It is retained for
+> context, not as current `dev` behavior. Follow the layer specs and
+> `AGENT_PRODUCT_PLAN.md` for new implementation work.
+
 The one-week MVP should be built as four connected domains. Each engineer owns a clear surface area and integrates through stable contracts.
 
 ## Engineer 1: Data and Risk Engine

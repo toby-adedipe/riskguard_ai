@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 import unittest
 
 from app.demo_data.dataset import load_demo_scenario
 
 
-class DemoDatasetTestCase(unittest.TestCase):
-    def test_ikeja_demo_fixture_is_schema_valid_and_cross_domain(self) -> None:
+class DemoDatasetTest(unittest.TestCase):
+    def test_presentation_fixture_is_schema_valid_and_cross_domain(self) -> None:
         scenario = load_demo_scenario()
 
         self.assertEqual(len(scenario.risk_scores), 1)

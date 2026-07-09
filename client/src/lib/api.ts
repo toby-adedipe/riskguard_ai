@@ -96,6 +96,7 @@ export interface LGA {
   id: string;
   name: string;
   risk: number;
+  severity: "green" | "amber" | "red";
   timeToBreach: string;
 }
 
@@ -129,6 +130,7 @@ export interface MitigationAction {
   confidence: number;
   timeToEffect: string;
   description: string;
+  projectedScoreCurve: number[];
 }
 
 export interface CompliancePack {
@@ -175,6 +177,7 @@ export const parseRiskMap = (payload: RiskMapResponse | RiskScore[]): LGA[] => {
     id: score.lga_id,
     name: lgaNames[score.lga_id] ?? score.lga_id,
     risk: score.score,
+    severity: score.severity,
     timeToBreach: fmtMinutes(score.time_to_breach_minutes),
   }));
 };
@@ -237,6 +240,7 @@ export const parseMitigationActions = (payload: ActionSimulationApi): Mitigation
     confidence: action.confidence,
     timeToEffect: `${action.time_to_effect_minutes}m`,
     description: action.description || "Mitigation action",
+    projectedScoreCurve: action.projected_score_curve,
   }));
 };
 
@@ -274,24 +278,6 @@ export async function fetchIncident(incidentId: string): Promise<Incident> {
 export async function fetchCopilot(payload: { role: string; incident_id: string; query: string }): Promise<CopilotResponse> {
   const response = await api.post<CopilotApiResponse>("/copilot/query", payload);
   return parseCopilotResponse(response.data);
-}
-
-export async function downloadInvestigationDocument(harnessRunId: string): Promise<void> {
-  const response = await api.get<Blob>(`/copilot/investigations/${harnessRunId}/document`, {
-    responseType: "blob",
-  });
-  const disposition = response.headers["content-disposition"] as string | undefined;
-  const filename =
-    disposition?.match(/filename="([^"]+)"/)?.[1] ??
-    `riskguard-investigation-${harnessRunId}.pdf`;
-  const url = window.URL.createObjectURL(response.data);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
 }
 
 export async function fetchMitigationActions(incidentId: string): Promise<MitigationAction[]> {

@@ -1,3 +1,7 @@
+/**
+ * Dormant transport/reducer prototype for the retired investigation stream.
+ * It is not part of the active app graph; see components/live/README.md.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Banknote,

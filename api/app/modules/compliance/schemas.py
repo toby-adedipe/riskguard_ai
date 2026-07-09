@@ -1,15 +1,15 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.schemas import AuditLogEntry, Incident
 
 
 class NCCPack(BaseModel):
     incident: Incident
-    timeline: list[str] = []
-    affected_services: list[str] = []
-    kpis: dict[str, float] = {}
+    timeline: list[str] = Field(default_factory=list)
+    affected_services: list[str] = Field(default_factory=list)
+    kpis: dict[str, float] = Field(default_factory=dict)
     impacted_subscribers: int = 0
     root_cause: str = ""
-    corrective_actions: list[str] = []
-    approval_history: list[AuditLogEntry] = []
-    evidence_logs: list[str] = []
+    corrective_actions: list[str] = Field(default_factory=list)
+    approval_history: list[AuditLogEntry] = Field(default_factory=list)
+    evidence_logs: list[str] = Field(default_factory=list)

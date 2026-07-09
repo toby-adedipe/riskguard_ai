@@ -19,7 +19,7 @@ from app.modules.simulation.schemas import SimulationStatus
 
 
 class ActionService:
-    """Action APIs are driven by deterministic demo scenario data."""
+    """Presentation-fixture actions retained independently of agent reasoning."""
 
     def __init__(
         self,
@@ -66,11 +66,7 @@ class ActionService:
                     description=options.get(projection.action_id).description
                     if projection.action_id in options
                     else "Mitigation action from playbook simulation.",
-                    risk_reduction=self._resolve_risk_reduction(
-                        projection.action_id,
-                        projection,
-                        options.get(projection.action_id),
-                    ),
+                    risk_reduction=self._resolve_risk_reduction(projection),
                     projected_score_curve=projection.projected_score_curve,
                     confidence=projection.confidence,
                     time_to_effect_minutes=projection.time_to_effect_minutes,
@@ -118,12 +114,8 @@ class ActionService:
 
     def _resolve_risk_reduction(
         self,
-        action_id: str,
         projection: ActionProjection,
-        option,
     ) -> float:
-        if option is not None and option.expected_risk_delta is not None:
-            return float(option.expected_risk_delta)
         if projection.projected_score_curve:
             start = projection.projected_score_curve[0]
             projected_end = projection.projected_score_curve[-1]

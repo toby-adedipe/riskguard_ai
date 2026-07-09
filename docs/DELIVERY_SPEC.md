@@ -2,6 +2,11 @@
 
 _Part of the demo→product bundle. This is where the system's conclusions become artifacts humans and regulators act on: the evidence pack, the consumer notice, the human approval gate, the append-only audit, and the regulator filing. It consumes layer 4 (validated agent output) and layer 5 (the rulepack), and it is the layer the buyer actually sees._
 
+> **Status (2026-07-09): north-star specification.** The existing action,
+> audit, and compliance modules are presentation/demo scaffolds. Provenance,
+> authenticated approval, durable hash-chained audit, consumer notices, and
+> regulator payload generation remain to be implemented.
+
 ## 0. What "as real as possible" means here
 
 For the demo, delivery produces **genuine, recognizable artifacts**, not mockups:
@@ -14,7 +19,7 @@ The **only** mocked boundary: we generate the NCC Uptime portal *submission payl
 
 ## 1. The evidence pack
 
-Builds on the existing `NCCPack` schema (`app/modules/compliance/schemas.py`) — 7 sections already defined: `timeline`, `affected_services`, `kpis`, `impacted_subscribers`, `root_cause`, `corrective_actions`, `approval_history`, `evidence_logs`. Today `ComplianceService.build_pack` returns them mostly empty. Delivery fills them **for real, from provenance-controlled sources**.
+Builds on the existing `NCCPack` schema (`app/modules/compliance/schemas.py`) — eight sections already defined: `timeline`, `affected_services`, `kpis`, `impacted_subscribers`, `root_cause`, `corrective_actions`, `approval_history`, `evidence_logs`. The current service fills them from a presentation fixture and process-local audit state. Delivery replaces those inputs with **provenance-controlled sources**.
 
 ### 1.1 Provenance rule (non-negotiable)
 Every line in the pack traces to a source of record. Nothing is authored free-hand by the assembler:
@@ -35,7 +40,7 @@ Extend `NCCPack` with three fields the current shape lacks: `status` (`draft` \|
 A pack assembled before the investigation converges shows **explicit gaps** ("Root cause: investigation in progress — leading hypothesis: probable transport break, confidence 0.72") rather than blanks or padding. A visibly-incomplete draft is compliant work-in-progress; a padded one is a liability. The compliance agent (layer 4) owns the wording; delivery owns the assembly and the gap-marking.
 
 ### 1.3 Rendering
-Two renders from one `NCCPack`: a **PDF** (human/regulator-readable, letterhead, sections, evidence appendix) and a **structured JSON** (the Uptime-portal payload shape). Both carry the hash + rulepack version + generation timestamp. The signature line follows the pattern already sketched in `docs/COMPLIANCE_DOCUMENTATION.md` but the hash must be a real digest of the content, not a decorative string.
+Two renders from one `NCCPack`: a **PDF** (human/regulator-readable, letterhead, sections, evidence appendix) and a **structured JSON** (the Uptime-portal payload shape). Both carry the hash + rulepack version + generation timestamp. The signature line must show the approving officer, approval timestamp, and a real digest of the finalized content.
 
 ## 2. The consumer notice
 
@@ -43,7 +48,7 @@ A separate artifact from the regulator pack, governed by the rulepack's `consume
 
 ## 3. The human approval gate
 
-The only path from recommendation to action. Builds on the existing `actions` module (`ActionSimulateRequest/Response`, `ActionApproveRequest/Response`, `ActionProjection`) — `approve()` already writes an audit entry correctly; `simulate()` is the stub to make real.
+The only path from recommendation to action. Builds on the existing `actions` module (`ActionSimulateRequest/Response`, `ActionApproveRequest/Response`, `ActionProjection`) — `approve()` writes an audit entry and `simulate()` currently returns fixture-backed curves. Production delivery replaces those curves with engine-owned simulations and authenticates the approver.
 
 Flow:
 ```
@@ -91,7 +96,7 @@ Design note: the dashboard renders only what the API returns (the existing front
 
 ## 7. Definition of done (layer 6)
 
-- A converged investigation produces a `final` `NCCPack` with all 7 sections populated from provenance-controlled sources, a real content hash, and the rulepack version stamped.
+- A converged investigation produces a `final` `NCCPack` with all eight sections populated from provenance-controlled sources, a real content hash, and the rulepack version stamped.
 - Root-cause and consumer-notice wording preserve the agents' hedges (no certainty inflation between layer 4 and the filed artifact).
 - Recovery cannot start without a human approval that references a simulation; the approval is an immutable, hash-chained audit entry.
 - The audit log verifies (hash chain intact) and exports as a signed bundle.

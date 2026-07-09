@@ -41,7 +41,11 @@ def run_fixture_spike(
     transcript_dir: Path = DEFAULT_TRANSCRIPT_DIR,
     max_tool_calls: int = 2,
 ) -> SpikeResult:
-    """Run the W0 integration spike without requiring a live model provider."""
+    """Run the W0 fixture/extraction spike without a live model provider.
+
+    The supplied observations are a fixture trace. This function does not run a
+    model-to-tool loop and must not be used as evidence that orchestration works.
+    """
 
     fixture = json.loads(scenario_path.read_text(encoding="utf-8"))
     incident = fixture["incident"]
@@ -85,11 +89,11 @@ def run_fixture_spike(
         {
             "run_id": run_id,
             "mode": "dry_run",
-            "harness": "pi-spike-dry-run",
+            "harness": "w0-fixture-conformance-spike",
             "created_at": datetime.now(timezone.utc),
             "scenario_id": fixture["scenario_id"],
             "criteria": {
-                "tool_loop_iterated": len(tool_calls) >= 2,
+                "fixture_tool_trace_loaded": len(tool_calls) >= 2,
                 "transcript_persisted": True,
                 "budget_enforced": len(tool_calls) <= max_tool_calls,
                 "structured_output_extracted": extraction.response.validation_status

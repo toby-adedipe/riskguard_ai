@@ -1,3 +1,8 @@
+/**
+ * Dormant design reference. This screen targets the retired deterministic
+ * event/session contract and is deliberately absent from the active app.
+ * See ./README.md before reusing any part of it.
+ */
 import { motion, AnimatePresence } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

@@ -2,6 +2,7 @@ from app.modules.audit.db import AuditLogRepository
 from app.modules.compliance.db import CompliancePackRepository
 from app.modules.compliance.schemas import NCCPack
 from app.modules.incidents.db import IncidentRepository
+from app.modules.risk.db import RiskScoreRepository
 
 
 class ComplianceService:
@@ -10,10 +11,12 @@ class ComplianceService:
         incidents: IncidentRepository,
         audit: AuditLogRepository,
         packs: CompliancePackRepository,
+        risks: RiskScoreRepository,
     ) -> None:
         self._incidents = incidents
         self._audit = audit
         self._packs = packs
+        self._risks = risks
 
     def build_pack(self, incident_id: str) -> NCCPack | None:
         incident = self._incidents.get(incident_id)
@@ -21,6 +24,8 @@ class ComplianceService:
             return None
 
         approval_history = self._audit.for_incident(incident_id)
+        current_risk = self._risks.get(incident.lga_id)
+        current_risk_score = current_risk.score if current_risk is not None else 87.0
 
         timeline = [
             f"{incident.opened_at.isoformat()} — incident opened ({incident.cause}).",
@@ -34,7 +39,7 @@ class ComplianceService:
         if incident.phase in ("recovery", "mitigating"):
             timeline.append("Mitigation underway following operator approval.")
         if incident.phase == "resolved":
-            timeline.append("Score returned to recovery floor (42).")
+            timeline.append(f"Score returned to {current_risk_score:g}.")
 
         affected_services = ["voice", "data", "sms"]
         if incident.impact.enterprise_lines > 0:
@@ -42,7 +47,7 @@ class ComplianceService:
 
         kpis = {
             "peak_risk_score": 87.0,
-            "recovery_floor": 42.0,
+            "current_risk_score": current_risk_score,
             "time_to_breach_minutes": 47.0,
             "subscribers_affected": float(incident.impact.affected_subscribers),
             "enterprise_lines_affected": float(incident.impact.enterprise_lines),

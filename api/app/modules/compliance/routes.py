@@ -5,6 +5,7 @@ from app.modules.compliance.db import CompliancePackRepository, get_compliance_r
 from app.modules.compliance.schemas import NCCPack
 from app.modules.compliance.services import ComplianceService
 from app.modules.incidents.db import IncidentRepository, get_incident_repo
+from app.modules.risk.db import RiskScoreRepository, get_risk_repo
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
 
@@ -13,8 +14,9 @@ def get_service(
     incidents: IncidentRepository = Depends(get_incident_repo),
     audit: AuditLogRepository = Depends(get_audit_repo),
     packs: CompliancePackRepository = Depends(get_compliance_repo),
+    risks: RiskScoreRepository = Depends(get_risk_repo),
 ) -> ComplianceService:
-    return ComplianceService(incidents, audit, packs)
+    return ComplianceService(incidents, audit, packs, risks)
 
 
 @router.get("/pack/{incident_id}", response_model=NCCPack)

@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,7 +19,17 @@ from app.modules.simulation.routes import router as simulation_router
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        SimulationService(
+            repo=get_simulation_repo(),
+            risk_repo=get_risk_repo(),
+            incident_repo=get_incident_repo(),
+        ).start()
+        yield
+
+    app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -36,13 +49,5 @@ def create_app() -> FastAPI:
     app.include_router(copilot_router)
     app.include_router(actions_router)
     app.include_router(compliance_router)
-
-    @app.on_event("startup")
-    async def seed_state() -> None:
-        SimulationService(
-            repo=get_simulation_repo(),
-            risk_repo=get_risk_repo(),
-            incident_repo=get_incident_repo(),
-        ).start()
 
     return app

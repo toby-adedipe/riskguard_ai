@@ -2,22 +2,50 @@
 
 _Build spec for the team. Turns two pitch claims into real behavior, additively, against the existing `api/app` modules. Scope: 3–5 focused days. See `pitch/mtn-meeting/04-product-roadmap.md` for why this is Phase 0._
 
+> **Status (2026-07-09): north-star implementation spec, not current behavior.**
+> The retained `/simulation/*` path loads an explicit presentation fixture so
+> the `dev` frontend remains usable. It is not replay ingestion, detection, or
+> an agent wake-up. Those capabilities begin with the modules defined below.
+
 ## 1. Goal
 
 Two deliverables:
 
 - **A — Replay adapter + real detection.** Ingest a file of incident telemetry (CSV/JSONL), normalize to `SignalEvent`, run a genuine (simple, data-driven) detector that writes `RiskScore` and opens an `Incident` with computed `IncidentImpact`. Feeding a *different* file must produce a *different, sensible* result — no hardcoded 87.
-- **B — Machine-initiated analysis.** When detection opens an incident, the system automatically runs the network + revenue agents and persists grounded `AgentResponse`s — with no `POST /copilot/query`. The existing query endpoint remains as secondary drill-down.
+- **B — Machine-initiated analysis handoff.** When detection opens an
+  incident, it emits a durable `IncidentOpened` event. A connected W1/W2 agent
+  runtime consumes that event and persists grounded responses without a human
+  query. Until that runtime exists, analysis remains explicitly pending; Phase
+  0 must not synthesize role responses to make the flow look complete.
 
-Together these make two sentences literally true: *"send us any past incident export and we'll show you your own outage in RiskGuard"* and *"no one prompts it — it listens and concludes on its own."*
+Deliverable A makes *"send us any past incident export and we'll show you your
+own outage in RiskGuard"* true. Deliverable B establishes the unprompted handoff;
+*"it listens and concludes on its own"* becomes true only when the real W1/W2
+runtime consumes that event. The interim UI must show analysis as unavailable.
 
 ## 2. Reality check (what exists today in `api/app`)
 
-- **Contracts are solid and complete** in `app/core/schemas.py`: `SignalEvent`, `FeatureWindow`, `SignalEvidence`, `RiskScore`, `Incident`, `IncidentImpact`, `AuditLogEntry`, `AgentResponse` (with `facts[].evidence_id`, `tools_called`, `validation_status`). Build against these; do not redefine them.
-- **Everything else is a stub.** `simulation/services.py` flips a mode flag and hardcodes `INC-2025-IKEJA-001`. `risk` never gets populated (`RiskScoreRepository` is written by nothing). `incidents` repo is written by nothing. `copilot/services.py` returns an empty `AgentResponse`. There is **no risk engine, no SignalEvent generator, and no LLM/Semantic-Kernel dependency** (`pyproject.toml` has only fastapi/uvicorn/pydantic). `demo_data/` is empty.
-- **Repos are module-global singletons** (`_repo` + `get_*_repo()` in each `db.py`). The ingestion path must write to those same instances so the API reads them back. Reuse `get_risk_repo()` and `get_incident_repo()`.
+- **Contracts are retained** in `app/core/schemas.py`: `SignalEvent`,
+  `FeatureWindow`, `SignalEvidence`, `RiskScore`, `Incident`,
+  `IncidentImpact`, `AuditLogEntry`, and the grounded `AgentResponse`. Build
+  against these seams; evolve them deliberately instead of redefining them in
+  an engine module.
+- **The active dashboard is fixture-backed.** `demo_data/` contains the Ikeja
+  presentation scenario, and `simulation/services.py` loads it into the risk
+  and incident repositories. That proves API/UI integration only; it is not a
+  detector, replay source, or calibrated model.
+- **W0 is a conformance spike.** The copilot package composes prompts, requests
+  strict provider output, extracts a grounded response, and writes a
+  transcript. It does not execute a model-driven tool loop. The interactive
+  query endpoint intentionally returns `503`.
+- **There is no production engine.** No active module converts arbitrary
+  telemetry into features, correlated incidents, or automatic agent wake-ups.
+- **Repositories are currently process-local singletons.** Phase 0 may reuse
+  them for the first replay slice, but must keep ingestion, engine, and HTTP
+  boundaries explicit so persistence can be replaced later.
 
-Implication: Phase 0 is additive. The seams already exist; we fill them.
+Implication: Phase 0 replaces the fixture as the source of risk and incident
+state; it does not extend the retired deterministic runtime.
 
 ## 3. Deliverable A — replay ingestion + detection
 
@@ -101,24 +129,25 @@ Wire both routers in `app/__init__.py` (alongside the existing `include_router` 
 ### 4.1 Event seam (no import cycle)
 Add `app/core/events.py` — a tiny synchronous in-process publisher: `subscribe(event_type, handler)`, `emit(event)`. Ingestion depends only on `core.events`, never on copilot. At app startup in `create_app()`, register the orchestrator as a subscriber to `IncidentOpened`. This keeps the dependency arrow ingestion → core ← copilot.
 
-### 4.2 Evolve `copilot` into an orchestrator
-Rename intent of `copilot/services.py` → add `orchestrator.py`:
+### 4.2 Define the runtime handoff
+Add a narrow port behind the event seam; do not restore the retired
+`copilot/services.py` runtime or implement a fixed role playbook:
 ```python
-class CopilotOrchestrator:
-    def run_for_incident(self, incident_id: str,
-                         roles=("network_risk", "revenue_assurance")) -> list[AgentResponse]: ...
+class IncidentAnalysisRuntime(Protocol):
+    def start_for_incident(self, incident_id: str) -> str: ...  # run id
 ```
-Each role builds an `AgentResponse` **from the evidence the detector already produced** (no LLM in Phase 0):
-- `network_risk`: `facts` = top contributing anomalies, each `AgentFact(claim, evidence_id)` from `EvidenceRepository`; `inferences` = inferred cause + time-to-breach with confidence; `recommendations` = "review mitigation options" (`requires_approval=True`).
-- `revenue_assurance`: `facts` = affected subscribers, enterprise lines, revenue-at-risk, compensation exposure (each tied to an evidence/computation id); `inferences` = NCC classification from `engine.classify`; `recommendations` accordingly.
-- **Claim validator** (keep as a real gate): every `fact.evidence_id` must resolve in `EvidenceRepository` or a computation record, else the fact is dropped and `validation_status="revised"` (or `"rejected"` if nothing survives). This is the trust story; make it real.
-
-Persist via new `AgentRunRepository` (`app/modules/copilot/db.py`, singleton) keyed by `incident_id`.
-
-> Honest boundary: Phase 0 reasoning is deterministic/rule-based behind the `AgentResponse` contract. Phase 1/2 swaps the internals for Semantic Kernel + Azure OpenAI agents with **no contract or endpoint change**. Say exactly this if asked — don't imply the LLM agents run today.
+The Phase-0 handler may persist `pending_runtime` with the incident and event
+ids, but it does not emit `AgentResponse`. W1/W2 supplies the real budgeted
+model-to-tool loop described in `AGENT_PRODUCT_PLAN.md`; the claim validator
+then gates every fact against the evidence repository before a response is
+persisted. Runtime availability changes status, never the detector outcome.
 
 ### 4.3 Read path
-Add to the `incidents` module: `GET /incidents/{incident_id}/analysis` → `list[AgentResponse]` from `AgentRunRepository`. The frontend polls this after an incident opens; conclusions appear unprompted. Keep `POST /copilot/query` for drill-down.
+Add to the `incidents` module: `GET /incidents/{incident_id}/analysis`. Before
+W1/W2 is connected it returns an explicit `pending_runtime` status and no
+conclusions. After connection it returns the run status plus validated
+`AgentResponse` records. Keep `POST /copilot/query` disabled until the same
+runtime supports grounded drill-down.
 
 ## 5. The ingestion file format (the "send us your incident export" contract)
 

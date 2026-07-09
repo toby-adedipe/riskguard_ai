@@ -2,6 +2,11 @@
 
 Modular FastAPI backend. Package management is via [Poetry](https://python-poetry.org/). `requirements.txt` is kept up to date as a fallback for pip-only environments.
 
+The current copilot code is a W0 strict-output conformance spike: it validates
+fixture-backed agent envelopes and provider response extraction. It is not an
+interactive agent runtime. `GET /copilot/status` exposes that boundary and
+`POST /copilot/query` returns `503` until a production runtime is implemented.
+
 ## Layout
 
 ```
@@ -58,6 +63,19 @@ For a non-reload run (production-style):
 ```bash
 poetry run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
+
+## Run the W0 conformance spike
+
+From `api/`, run the fixture-backed path without provider credentials:
+
+```bash
+poetry run python -m scripts.w0_agent_spike
+```
+
+To test strict structured output against OpenRouter, set
+`OPENROUTER_API_KEY` in `.env` and add `--live-openrouter-strict`. This still
+tests provider and extraction conformance only; it is not a model-driven tool
+loop or an interactive agent runtime.
 
 You can also drop into the venv shell first and run `uvicorn` directly:
 
@@ -141,4 +159,3 @@ This works but should be the exception. Poetry is the source of truth.
 ## Branching, PRs, and team workflow
 
 See the [root README](../README.md#branching-and-pull-requests) for the shared `main`/`dev` branching model and pull request process. It applies to both `api/` and `client/`.
- 

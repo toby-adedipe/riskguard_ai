@@ -1,10 +1,18 @@
 # RiskGuard AI
 
-RiskGuard AI is an early-warning and decision-support system for operational telecom risk. The MVP detects an emerging incident in a Lagos LGA (canonical demo: Ikeja), explains it with grounded AI agents, lets an operator compare and approve mitigation options, tracks recovery, and produces an NCC-ready evidence pack.
+RiskGuard AI is an early-warning and decision-support product for operational telecom risk. The target product detects an emerging incident, investigates it with grounded agents, lets an operator approve mitigation, and produces an NCC-ready evidence pack.
 
-It is a vertical slice — convincing, deterministic, and end-to-end — not the production system.
+The current `dev` branch is deliberately earlier than that target. It contains
+the frontend presentation fixture and the W0 strict-output agent conformance
+spike, but no interactive agent runtime or production detection engine. The
+copilot endpoint fails closed with `503`; the UI labels the runtime offline.
+The layer specifications in `docs/` are the implementation north star, not a
+claim that those layers already exist.
 
-For the full picture, read [`docs/MVP_BLUEPRINT.md`](docs/MVP_BLUEPRINT.md). It explains the demo we are shipping, the four engineering domains, and how the domains plug into each other.
+Start with [`docs/AGENT_PRODUCT_PLAN.md`](docs/AGENT_PRODUCT_PLAN.md), then read
+the detection, replay/autonomy, delivery, and rulepack specifications in
+[`docs/`](docs/). The reset decision and current boundary are recorded in
+[`docs/architecture/decisions/0001-w0-agent-runtime-reset.md`](docs/architecture/decisions/0001-w0-agent-runtime-reset.md).
 
 ## Repository layout
 
@@ -12,7 +20,7 @@ For the full picture, read [`docs/MVP_BLUEPRINT.md`](docs/MVP_BLUEPRINT.md). It 
 riskguard_ai/
 ├── api/        FastAPI backend (Poetry-managed). See api/README.md.
 ├── client/     Vite + React + TypeScript frontend.
-└── docs/       MVP blueprint, functional requirements, plan, architecture diagrams.
+└── docs/       Product north star, layer specifications, rulepacks, and ADRs.
 ```
 
 ## Getting started

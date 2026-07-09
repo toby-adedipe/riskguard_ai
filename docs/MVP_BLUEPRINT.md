@@ -1,5 +1,10 @@
 # RiskGuard AI — MVP Blueprint
 
+> **Historical integration blueprint.** This preserves the original
+> deterministic hackathon architecture and team split. It is not a claim about
+> current `dev`. The current north star is the agent product plan plus the
+> detection, replay/autonomy, delivery, and rulepack specifications.
+
 This is the single document every engineer should read on Day 1, before opening their domain code. It explains what we are building this week, the demo we are telling, the four ownership domains, and exactly how those domains plug into each other.
 
 For depth on any section, follow the links in [Section 9](#9-pointers).
@@ -347,7 +352,7 @@ If you are about to break one of these to ship faster, stop and escalate.
 
 - [`Comprehensive reqs.md`](./Comprehensive%20reqs.md) — what users must be able to do; non-functional targets.
 - [`MVP_PLAN.md`](./MVP_PLAN.md) — full scope, capacity, day-by-day plan, agent runtime details, cut line.
-- [`ENGINEER4_PLAN.md`](./ENGINEER4_PLAN.md) — detailed wake-on-signal copilot implementation plan, tool contracts, trigger flow, and execution order for Engineer 4.
+- [`AGENT_PRODUCT_PLAN.md`](./AGENT_PRODUCT_PLAN.md) — current wake-on-signal agent product plan, tool boundaries, and execution roadmap.
 - [`docs/architecture/mvp_engineering_domains.md`](architecture/mvp_engineering_domains.md) — per-domain component lists.
 - `docs/architecture/riskguard-mvp-engineering-domains.excalidraw` — visual ownership view.
 - `docs/architecture/riskguard-modules-classes.excalidraw` — module and class interaction view.

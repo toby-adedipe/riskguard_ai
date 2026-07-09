@@ -9,6 +9,11 @@ from app.modules.simulation.schemas import SimulationStatus
 
 
 class SimulationService:
+    """Presentation-fixture adapter retained while replay ingestion is built.
+
+    This service must not be described as detection or autonomous analysis.
+    """
+
     def __init__(
         self,
         repo: SimulationRepository,
@@ -71,26 +76,6 @@ class SimulationService:
         )
 
         status = SimulationStatus(mode="incident", incident_id="INC-2026-IKEJA-001")
-        self._repo.set(status)
-        return status
-
-    def mitigate(self) -> SimulationStatus:
-        current = self._repo.get()
-        incident_id = current.incident_id
-        if incident_id is not None and self._incident_repo.get(incident_id) is not None:
-            self._incident_repo.set_phase(incident_id, "mitigating")
-            self._risk_repo.upsert(
-                RiskScore(
-                    lga_id="ikeja",
-                    score=42.0,
-                    severity="amber",
-                    confidence=0.93,
-                    time_to_breach_minutes=125,
-                    updated_at=datetime.now(timezone.utc),
-                )
-            )
-
-        status = SimulationStatus(mode="mitigating", incident_id=incident_id)
         self._repo.set(status)
         return status
 

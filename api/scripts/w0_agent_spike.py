@@ -16,7 +16,7 @@ DEFAULT_API_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run the W0 agent-runtime dry-run spike against scenario 1.",
+        description="Run the W0 strict-output conformance spike against scenario 1.",
     )
     parser.add_argument(
         "--scenario",
@@ -129,7 +129,7 @@ def run_openrouter_strict(
     user_prompt = json.dumps(
         {
             "instruction": (
-                "Runtime spike: the tool loop has already produced these observations. "
+                "Provider conformance spike: these observations were supplied by a fixture. "
                 "Use only this data, then emit the final AgentResponse JSON object."
             ),
             "tool_observations": tool_calls,

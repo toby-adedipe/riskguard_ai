@@ -1,5 +1,10 @@
 # RiskGuard AI One-Week MVP Plan
 
+> **Historical demo plan.** This document preserves the original one-week,
+> deterministic hackathon scope. It does not describe current `dev` behavior
+> or the target runtime. Use `AGENT_PRODUCT_PLAN.md` and the layer specs as the
+> implementation north star.
+
 ## Reality Check
 
 Four people cannot build the full production architecture in one week. The realistic goal is a convincing vertical slice that proves the product value:

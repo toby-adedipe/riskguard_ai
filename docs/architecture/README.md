@@ -4,6 +4,10 @@ This folder contains three Excalidraw diagrams for the RiskGuard AI system.
 
 For the structural narrative tying these diagrams to the four engineering domains, see [`../MVP_BLUEPRINT.md`](../MVP_BLUEPRINT.md).
 
+Architecture decisions are recorded in [`decisions/`](decisions/). The current
+runtime reset and W0 boundary are documented in
+[`decisions/0001-w0-agent-runtime-reset.md`](decisions/0001-w0-agent-runtime-reset.md).
+
 ## Diagrams
 
 1. `riskguard-infrastructure.excalidraw`

@@ -51,3 +51,25 @@ class AgentEnvelope(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     tools_called: list[str] = Field(default_factory=list)
+
+
+class CopilotRuntimeStatus(BaseModel):
+    stage: Literal["w0_spike"] = "w0_spike"
+    interactive_runtime: bool = False
+    verified_capabilities: list[str] = Field(
+        default_factory=lambda: [
+            "prompt_composition",
+            "strict_output_schema",
+            "response_extraction",
+            "grounded_fact_validation",
+            "transcript_persistence",
+        ]
+    )
+    pending_capabilities: list[str] = Field(
+        default_factory=lambda: [
+            "model_tool_loop",
+            "event_wakeup",
+            "multi_agent_orchestration",
+            "runtime_budgets",
+        ]
+    )

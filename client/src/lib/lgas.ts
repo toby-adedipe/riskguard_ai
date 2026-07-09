@@ -1,4 +1,4 @@
-// All LGAs from data-engine/build_lga_map.py — organised by city
+// Presentation metadata for the current frontend map, organised by city.
 export interface LGAMeta {
   id: string;       // snake_case slug matching backend lga_id
   name: string;     // display name
@@ -134,7 +134,7 @@ export const LGA_NAMES: Record<string, string> = Object.fromEntries(
   ALL_LGA_META.map((l) => [l.id, l.name]),
 );
 
-// Static demo past incidents per LGA (subset — major LGAs get richer history)
+// Presentation-only incident history (subset — major LGAs get richer fixtures).
 export const PAST_INCIDENTS: Record<string, PastIncident[]> = {
   ikeja: [
     { id: "INC-2026-IKJ-001", date: "2026-05-05", cause: "Fibre cut — Oshodi-Ikeja trunk", duration: "2h 14m", affectedSubs: 84200, resolved: true },

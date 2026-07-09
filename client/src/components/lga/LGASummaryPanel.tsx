@@ -64,7 +64,7 @@ const DEFAULT_KPI = {
   latencyMs: 40,
 };
 
-// Domain z-scores from incident simulation (same data used in live investigations)
+// Presentation-only domain scores for the selected demo incident.
 const DOMAIN_Z_SCORES: Record<string, number> = {
   network: 6.5, // packet loss +6.5σ
   bts: 4.2, // power stability -4.2σ (7 sites down) — stored as magnitude
@@ -307,19 +307,12 @@ export function LGASummaryPanel({
   const risk = liveLga?.risk ?? 12;
   const meta = LGA_BY_ID[lgaId];
   const kpi = getKpi(lgaId);
-  const storedResolved = JSON.parse(localStorage.getItem(`rg_resolved_${lgaId}`) ?? "[]") as PastIncident[];
-  const staticIncidents = lgaId === "ikeja" ? [] : (PAST_INCIDENTS[lgaId] ?? []);
-  const seen = new Set<string>();
-  const pastIncidents = [...storedResolved, ...staticIncidents].filter((inc) => {
-    if (seen.has(inc.id)) return false;
-    seen.add(inc.id);
-    return true;
-  });
+  const pastIncidents = PAST_INCIDENTS[lgaId] ?? [];
   const isHighRisk = risk > 40;
-  const isRecovered = storedResolved.length > 0 && lgaId === "ikeja";
+  const isRecovered = liveLga?.severity === "amber" && lgaId === "ikeja";
 
-  // Whether this LGA can trigger a live investigation (only Ikeja has backend support)
-  const canInvestigate = lgaId === "ikeja";
+  // Ikeja retains an explicit presentation fixture while replay ingestion is built.
+  const canLoadDemo = lgaId === "ikeja";
 
   return (
     <motion.div
@@ -398,7 +391,7 @@ export function LGASummaryPanel({
         </div>
 
         {/* CTA — show only if risk is elevated or it's Ikeja */}
-        {(isHighRisk || canInvestigate) && (
+        {(isHighRisk || canLoadDemo) && (
           <div
             className={`px-5 py-3 border-t flex items-center justify-between ${
               isRecovered
@@ -423,7 +416,7 @@ export function LGASummaryPanel({
                   ? "Incident contained — network stabilising"
                   : isHighRisk
                     ? "Risk threshold breached — immediate investigation required"
-                    : `Simulate network incident for ${meta?.name ?? lgaId}`}
+                    : `Load presentation fixture for ${meta?.name ?? lgaId}`}
               </p>
             </div>
             <button
@@ -437,7 +430,7 @@ export function LGASummaryPanel({
                     : "bg-primary text-white hover:bg-[#006CBE]"
               }`}
             >
-              {isTriggering ? "Launching..." : isRecovered ? "View Incident Report" : "View Active Incident"}
+              {isTriggering ? "Loading..." : isRecovered ? "View Incident Report" : "Load Demo Incident"}
               <ChevronRight size={13} />
             </button>
           </div>
